@@ -16,7 +16,8 @@ export default defineConfig({
     },
     {
       name: "mobile",
-      use: { ...devices["iPhone 13"] },
+      // Viewport iPhone mais moteur Chromium : la CI n'installe que Chromium.
+      use: { ...devices["iPhone 13"], browserName: "chromium" },
     },
   ],
   webServer: {
