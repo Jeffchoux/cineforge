@@ -114,6 +114,15 @@ export const SCENE_CSS = `
   color: #fff; text-align: center; line-height: 1.35;
 }
 
+/* Accents décoratifs : élément graphique d'appui, jamais porteur de sens. */
+.stat-ghost, .quote-ghost {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--font-head); font-weight: 900; color: var(--ink);
+  pointer-events: none; user-select: none; line-height: 1;
+}
+.stat-ghost { font-size: calc(var(--u) * 46); opacity: 0.07; letter-spacing: -0.04em; }
+.quote-ghost { font-size: calc(var(--u) * 60); opacity: 0.08; place-items: end center; padding-bottom: calc(var(--u) * 2); }
+
 /* Densification 16:9 : la hauteur limite --u, on regagne la largeur. */
 .aspect-landscape .stat-value { font-size: calc(var(--u) * 22); }
 .aspect-landscape .stat-label { font-size: calc(var(--u) * 4); max-width: 62%; }
@@ -124,6 +133,32 @@ export const SCENE_CSS = `
 .aspect-landscape .hook-title { max-width: 78%; }
 .aspect-landscape .quote-text { max-width: 70%; }
 .aspect-portrait .scene-inner { padding: calc(var(--u) * 5); }
+
+/* Layout split 16:9 — métaphore : visuel à gauche, texte à droite. */
+.aspect-landscape .scene-metaphor {
+  grid-template-columns: minmax(0, 44%) minmax(0, 48%);
+  grid-template-areas: "visual label" "visual caption";
+  column-gap: calc(var(--u) * 7); row-gap: calc(var(--u) * 2.4);
+  justify-content: center; align-content: center;
+  justify-items: start; text-align: left;
+}
+.aspect-landscape .scene-metaphor .visual-stage { grid-area: visual; justify-self: center; align-self: center; }
+.aspect-landscape .scene-metaphor .metaphor-label { grid-area: label; align-self: end; font-size: calc(var(--u) * 6.4); }
+.aspect-landscape .scene-metaphor .metaphor-caption { grid-area: caption; align-self: start; max-width: 100%; }
+
+/* Layout split 16:9 — stat : chiffre à gauche, label à droite avec barre d'accent. */
+.aspect-landscape .scene-stat {
+  grid-template-columns: auto minmax(0, 40%);
+  column-gap: calc(var(--u) * 8);
+  justify-content: center; align-items: center;
+  justify-items: start; text-align: left;
+}
+.aspect-landscape .scene-stat .stat-label {
+  max-width: 100%; font-size: calc(var(--u) * 4.4); line-height: 1.35;
+  border-left: calc(var(--u) * 0.8) solid var(--accent);
+  padding-left: calc(var(--u) * 3);
+}
+.aspect-landscape .scene-stat .stat-ghost { place-items: center end; padding-right: calc(var(--u) * 4); }
 `;
 
 function sel(id: string): string {
@@ -146,18 +181,42 @@ function fitStyle(length: number, steps: [number, number][], fallback: number): 
   return ` style="font-size: calc(var(--u) * ${fitFontSize(length, steps, fallback)})"`;
 }
 
-/** Enveloppe standard d'un clip HyperFrames. */
+/** Format d'affichage du chiffre fantôme (pas de décimales inutiles). */
+function formatStatValue(value: number): string {
+  return (Number.isInteger(value) ? value.toString() : value.toFixed(1)).replace(".", ",");
+}
+
+/** Enveloppe standard d'un clip HyperFrames (classe par type pour les layouts). */
 function clip(scene: Scene, inner: string): string {
   return `<div id="${escapeHtml(scene.id)}" class="clip" data-start="${scene.start}" data-duration="${scene.duration}" data-track-index="1">
-  <div class="scene-inner">${inner}</div>
+  <div class="scene-inner scene-${scene.type}">${inner}</div>
 </div>`;
 }
 
-/** Entrée/sortie standard : rise-in au début, fade-out avant la fin. */
-function enterExit(id: string, start: number, end: number): string {
+type TransitionVariant = "default" | "hook" | "stat" | "metaphor";
+
+/**
+ * Entrée/sortie par type de scène — fondu enchaîné doux au lieu d'un cut sec.
+ * Seek-safe : uniquement des tweens à positions absolues, contenus dans la
+ * fenêtre de visibilité du clip (data-start → data-start+duration).
+ */
+function enterExit(id: string, start: number, end: number, variant: TransitionVariant = "default"): string {
   const s = sel(id);
-  return `tl.fromTo("${s} .scene-inner", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, ${start});
-tl.to("${s} .scene-inner", { opacity: 0, y: -28, duration: 0.35, ease: "power2.in" }, ${Math.max(start, end - 0.38)});`;
+  const exitAt = Math.max(start, end - 0.48);
+  switch (variant) {
+    case "hook":
+      return `tl.fromTo("${s} .scene-inner", { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, ${start});
+tl.to("${s} .scene-inner", { opacity: 0, scale: 0.94, duration: 0.45, ease: "power2.in" }, ${exitAt});`;
+    case "stat":
+      return `tl.fromTo("${s} .scene-inner", { opacity: 0, y: 64 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, ${start});
+tl.to("${s} .scene-inner", { opacity: 0, y: -56, duration: 0.45, ease: "power2.in" }, ${exitAt});`;
+    case "metaphor":
+      return `tl.fromTo("${s} .scene-inner", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, ${start});
+tl.to("${s} .scene-inner", { opacity: 0, filter: "blur(8px)", duration: 0.45, ease: "power2.in" }, ${exitAt});`;
+    default:
+      return `tl.fromTo("${s} .scene-inner", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, ${start});
+tl.to("${s} .scene-inner", { opacity: 0, y: -34, duration: 0.45, ease: "power2.in" }, ${exitAt});`;
+  }
 }
 
 function renderHook(scene: Extract<Scene, { type: "hook" }>): SceneRender {
@@ -172,7 +231,7 @@ function renderHook(scene: Extract<Scene, { type: "hook" }>): SceneRender {
   const html = clip(scene, `${kicker}<h1 class="hook-title"${fit}>${title}</h1>`);
   const s = sel(scene.id);
   const end = scene.start + scene.duration;
-  const timeline = `${enterExit(scene.id, scene.start, end)}
+  const timeline = `${enterExit(scene.id, scene.start, end, "hook")}
 tl.fromTo("${s} .hook-title", { scale: 0.94 }, { scale: 1, duration: ${Math.max(0.6, scene.duration - 0.4)}, ease: "power1.out" }, ${scene.start});`;
   return { html, timeline };
 }
@@ -233,22 +292,24 @@ tl.fromTo("${s} .v-pulse-core", { scale: 0.92 }, { scale: 1.06, duration: 0.7, y
 tl.fromTo("${s} .v-network line", { opacity: 0 }, { opacity: 0.7, duration: 0.4, stagger: 0.12 }, ${t0 + 0.7});`;
       break;
   }
-  return { html, timeline: `${enterExit(scene.id, t0, end)}\n${visualTl}` };
+  return { html, timeline: `${enterExit(scene.id, t0, end, "metaphor")}\n${visualTl}` };
 }
 
 function renderStat(scene: Extract<Scene, { type: "stat" }>): SceneRender {
   const prefix = escapeHtml(scene.prefix ?? "");
   const suffix = escapeHtml(scene.suffix ?? "");
+  const ghostText = escapeHtml(`${scene.prefix ?? ""}${formatStatValue(scene.value)}${scene.suffix ?? ""}`);
   const html = clip(
     scene,
-    `<div class="stat-value"><span class="stat-prefix">${prefix}</span><span class="stat-num">0</span><span class="stat-suffix">${suffix}</span></div>
+    `<div class="stat-ghost" aria-hidden="true">${ghostText}</div>
+<div class="stat-value"><span class="stat-prefix">${prefix}</span><span class="stat-num">0</span><span class="stat-suffix">${suffix}</span></div>
 <div class="stat-label">${escapeHtml(scene.label)}</div>`,
   );
   const s = sel(scene.id);
   const end = scene.start + scene.duration;
   const decimals = Number.isInteger(scene.value) ? 0 : 1;
   const countDur = Math.max(0.8, Math.min(2, scene.duration - 1));
-  const timeline = `${enterExit(scene.id, scene.start, end)}
+  const timeline = `${enterExit(scene.id, scene.start, end, "stat")}
 (function(){
   var target = { v: 0 };
   tl.to(target, { v: ${scene.value}, duration: ${countDur}, ease: "power1.out", onUpdate: function(){
@@ -296,7 +357,7 @@ tl.to("${s} .comp-fill.right", { width: "${clampPct(scene.rightValue)}%", durati
 function renderQuote(scene: Extract<Scene, { type: "quote" }>): SceneRender {
   const author = scene.author ? `<div class="quote-author">— ${escapeHtml(scene.author)}</div>` : "";
   const fit = fitStyle(scene.text.length, [[80, 6], [140, 5]], 4.2);
-  const html = clip(scene, `<div class="quote-mark">“</div><div class="quote-text"${fit}>${escapeHtml(scene.text)}</div>${author}`);
+  const html = clip(scene, `<div class="quote-ghost" aria-hidden="true">”</div><div class="quote-mark">“</div><div class="quote-text"${fit}>${escapeHtml(scene.text)}</div>${author}`);
   const s = sel(scene.id);
   const end = scene.start + scene.duration;
   const timeline = `${enterExit(scene.id, scene.start, end)}

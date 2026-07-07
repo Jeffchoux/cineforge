@@ -115,7 +115,6 @@ function buildPlayerRuntime(durationSec: number): string {
 }
 
 const DARK_THEMES = new Set(["midnight", "neon", "broadcast"]);
-const PATTERN_THEMES = new Set(["broadcast", "neon"]);
 
 /**
  * Décor de fond cinématographique : blobs flous aux couleurs du thème
@@ -126,7 +125,7 @@ const PATTERN_THEMES = new Set(["broadcast", "neon"]);
 function buildBackdrop(storyboard: Storyboard, theme: Theme): string {
   const rng = createRng(storyboard.brief.seed ?? hashString(storyboard.id));
   const dark = DARK_THEMES.has(theme.id);
-  const blobOpacity = dark ? 0.11 : 0.08;
+  const blobOpacity = dark ? 0.2 : 0.14;
 
   const blobs = [theme.accent, theme.accent2, theme.accent]
     .map((color, i) => {
@@ -138,20 +137,52 @@ function buildBackdrop(storyboard: Storyboard, theme: Theme): string {
     .join("\n  ");
 
   const vignette = dark
-    ? `<div class="backdrop-vignette" style="background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(0,0,0,0.38) 100%);"></div>`
+    ? `<div class="backdrop-vignette" style="background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(0,0,0,0.5) 100%);"></div>`
     : `<div class="backdrop-vignette" style="background: radial-gradient(ellipse at 50% 45%, transparent 60%, rgba(15,23,42,0.07) 100%);"></div>`;
-
-  const pattern = PATTERN_THEMES.has(theme.id)
-    ? `<div class="backdrop-pattern" style="background-image: linear-gradient(${theme.ink} 1px, transparent 1px), linear-gradient(90deg, ${theme.ink} 1px, transparent 1px); background-size: calc(var(--u) * 8) calc(var(--u) * 8); opacity: 0.04;"></div>`
-    : "";
 
   return `<div class="backdrop" aria-hidden="true">
   ${blobs}
-  ${pattern}
+  ${themeMotif(theme, rng)}
   ${vignette}
 </div>
 
 `;
+}
+
+/**
+ * Motif identitaire par thème — chaque thème a une signature graphique
+ * reconnaissable, déterministe (positions dérivées du rng seedé).
+ */
+function themeMotif(theme: Theme, rng: ReturnType<typeof createRng>): string {
+  switch (theme.id) {
+    case "midnight": {
+      // Constellation de points fins.
+      const stars = Array.from({ length: 18 }, () => {
+        const x = rng.int(96) + 2;
+        const y = rng.int(92) + 2;
+        const sz = 0.25 + rng.int(3) / 10;
+        return `<div style="position:absolute; left:${x}%; top:${y}%; width:calc(var(--u) * ${sz}); height:calc(var(--u) * ${sz}); border-radius:50%; background:${theme.ink}; opacity:${0.18 + rng.int(20) / 100};"></div>`;
+      }).join("");
+      return `<div class="backdrop-pattern">${stars}</div>`;
+    }
+    case "neon":
+      // Grille + halo saturé central.
+      return `<div class="backdrop-pattern" style="background-image: linear-gradient(${theme.ink} 1px, transparent 1px), linear-gradient(90deg, ${theme.ink} 1px, transparent 1px); background-size: calc(var(--u) * 8) calc(var(--u) * 8); opacity: 0.08;"></div>
+  <div class="backdrop-pattern" style="background: radial-gradient(ellipse at 50% ${40 + rng.int(20)}%, ${theme.accent2} 0%, transparent 55%); opacity: 0.16;"></div>`;
+    case "broadcast":
+      // Grille + bandeau diagonal dans l'accent.
+      return `<div class="backdrop-pattern" style="background-image: linear-gradient(${theme.ink} 1px, transparent 1px), linear-gradient(90deg, ${theme.ink} 1px, transparent 1px); background-size: calc(var(--u) * 8) calc(var(--u) * 8); opacity: 0.06;"></div>
+  <div class="backdrop-pattern" style="left:${-20 + rng.int(20)}%; width:150%; background: linear-gradient(115deg, transparent 38%, ${theme.accent} 38%, ${theme.accent} 46%, transparent 46%); opacity: 0.09;"></div>`;
+    case "paper":
+      // Texture pointillée d'imprimeur.
+      return `<div class="backdrop-pattern" style="background-image: radial-gradient(${theme.muted} 1px, transparent 1.5px); background-size: calc(var(--u) * ${4 + rng.int(3)}) calc(var(--u) * 5); opacity: 0.16;"></div>`;
+    case "pastel":
+      // Grandes formes arrondies douces.
+      return `<div class="backdrop-pattern" style="left:${50 + rng.int(30)}%; top:55%; width:70%; height:70%; border-radius: 42% 58% 55% 45% / 50% 44% 56% 50%; background:${theme.accent2}; opacity: 0.14;"></div>
+  <div class="backdrop-pattern" style="left:-25%; top:${-20 + rng.int(15)}%; width:55%; height:60%; border-radius: 55% 45% 48% 52% / 46% 55% 45% 54%; background:${theme.accent}; opacity: 0.1;"></div>`;
+    default:
+      return "";
+  }
 }
 
 /**

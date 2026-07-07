@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Brief, Scene, Storyboard } from "@/lib/engine";
-import { BRIEF_LIMITS, compileStoryboard, planStoryboard } from "@/lib/engine";
+import { BRIEF_LIMITS, compileStoryboard, planStoryboard, sanitizeStoryboard } from "@/lib/engine";
 import { BriefForm, type BriefFormState } from "./BriefForm";
 import { PreviewPlayer } from "./PreviewPlayer";
 import { SceneCard } from "./SceneCard";
@@ -74,7 +74,8 @@ export function StudioApp() {
           if (res.ok) {
             const data = (await res.json()) as { storyboard?: Storyboard };
             if (data.storyboard?.scenes?.length) {
-              next = data.storyboard;
+              // Défense en profondeur : la réponse repasse par la frontière.
+              next = sanitizeStoryboard(data.storyboard);
               setAiStatus("Storyboard écrit par l'IA ✓");
             } else {
               setAiStatus("Réponse IA vide — génération locale utilisée.");

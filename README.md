@@ -2,7 +2,7 @@
 
 > **Décrivez. Générez. Diffusez.** Un studio vidéo IA open-source : une phrase devient une vidéo professionnelle — rendue depuis du HTML animé, sans timeline, sans crédits, sans boîte noire.
 
-**Démo en ligne : [cineforge-jeffchouxs-projects.vercel.app](https://cineforge-jeffchouxs-projects.vercel.app)** · [Studio](https://cineforge-jeffchouxs-projects.vercel.app/studio)
+**Démo en ligne : [cineforge-fr.vercel.app](https://cineforge-fr.vercel.app)** · [Studio](https://cineforge-fr.vercel.app/studio)
 
 ## Qu'est-ce que c'est ?
 

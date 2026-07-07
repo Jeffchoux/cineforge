@@ -1,6 +1,10 @@
 import type { Scene, Storyboard } from "./types";
 import { BRIEF_LIMITS } from "./types";
 
+function str(v: string | undefined, max: number): string | undefined {
+  return v === undefined ? undefined : v.slice(0, max);
+}
+
 /**
  * Fusion des scènes proposées par l'IA dans un storyboard de base :
  * normalisation des ids, recalage des timings sur la durée cible,
@@ -57,28 +61,32 @@ export function mergeAiScenes(base: Storyboard, ai: AiStoryboardDraft): Storyboa
     cursor += duration;
     switch (s.type) {
       case "hook":
-        return { ...common, type: "hook", title: s.title ?? base.title, accentWord: s.accentWord, kicker: s.kicker };
+        return { ...common, type: "hook", title: str(s.title, BRIEF_LIMITS.topicMax) ?? base.title, accentWord: str(s.accentWord, 60), kicker: str(s.kicker, 40) };
       case "metaphor":
-        return { ...common, type: "metaphor", visual: s.visual ?? "growth", label: s.label ?? "", caption: s.caption ?? s.narration };
+        return { ...common, type: "metaphor", visual: s.visual ?? "growth", label: str(s.label, 80) ?? "", caption: str(s.caption, BRIEF_LIMITS.pointMax) ?? s.narration };
       case "stat":
         return {
           ...common, type: "stat",
           value: clampNumber(s.value, 0, 1_000_000_000),
           prefix: s.prefix?.slice(0, 4), suffix: s.suffix?.slice(0, 6),
-          label: s.statLabel ?? s.narration,
+          label: str(s.statLabel, BRIEF_LIMITS.pointMax) ?? s.narration,
         };
       case "steps":
-        return { ...common, type: "steps", title: s.title ?? "", items: (s.items ?? []).slice(0, 3) };
+        return {
+          ...common, type: "steps",
+          title: str(s.title, 80) ?? "",
+          items: (s.items ?? []).filter((it): it is string => typeof it === "string").map((it) => it.slice(0, BRIEF_LIMITS.pointMax)).slice(0, 3),
+        };
       case "comparison":
         return {
-          ...common, type: "comparison", title: s.title ?? "",
-          leftLabel: s.leftLabel ?? "A", rightLabel: s.rightLabel ?? "B",
+          ...common, type: "comparison", title: str(s.title, BRIEF_LIMITS.topicMax) ?? "",
+          leftLabel: str(s.leftLabel, 60) ?? "A", rightLabel: str(s.rightLabel, 60) ?? "B",
           leftValue: clampNumber(s.leftValue ?? 30, 0, 100), rightValue: clampNumber(s.rightValue ?? 90, 0, 100),
         };
       case "quote":
-        return { ...common, type: "quote", text: s.text ?? s.narration, author: s.author };
+        return { ...common, type: "quote", text: str(s.text, BRIEF_LIMITS.topicMax) ?? s.narration, author: str(s.author, 80) };
       case "cta":
-        return { ...common, type: "cta", title: s.title ?? "", subtitle: s.subtitle };
+        return { ...common, type: "cta", title: str(s.title, 80) ?? "", subtitle: str(s.subtitle, 120) };
       default:
         return { ...common, type: "quote", text: s.narration };
     }
