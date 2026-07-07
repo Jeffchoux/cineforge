@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+*.mp4
+*.mov
+.env*
+!.env.example
+.DS_Store
+.vercel/
+coverage/
+test-results/
+playwright-report/
+.agents/
+.playwright-mcp/
+*.jpeg

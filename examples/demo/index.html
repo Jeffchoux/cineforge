@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        margin: 0; width: 1920px; height: 1080px;
+        overflow: hidden; background: #000;
+      }
+      body { font-family: "Inter", -apple-system, sans-serif; }
+      #root {
+        position: relative; width: 1920px; height: 1080px;
+        background: radial-gradient(ellipse at 30% 20%, #101635 0%, #05070f 70%);
+      }
+      .clip { position: absolute; inset: 0; display: grid; place-items: center; }
+      .hook-text {
+        font-size: 110px; font-weight: 900; color: #fff;
+        text-align: center; line-height: 1.1; max-width: 1400px;
+        letter-spacing: -0.02em;
+      }
+      .hook-text .accent { color: #818cf8; }
+      .metaphor-stage { position: relative; display: grid; place-items: center; }
+      .battery {
+        width: 420px; height: 200px; border: 10px solid #e2e8f0;
+        border-radius: 32px; position: relative; background: rgba(255,255,255,0.04);
+      }
+      .battery::after {
+        content: ""; position: absolute; right: -34px; top: 60px;
+        width: 24px; height: 80px; background: #e2e8f0; border-radius: 8px;
+      }
+      .battery-fill {
+        position: absolute; left: 14px; top: 14px; bottom: 14px;
+        width: 0%; max-width: calc(100% - 28px);
+        background: linear-gradient(90deg, #22c55e, #4ade80);
+        border-radius: 18px;
+      }
+      .battery-label {
+        position: absolute; top: 260px; width: 100%; text-align: center;
+        font-size: 56px; font-weight: 800; color: #4ade80;
+      }
+      .cta-text {
+        font-size: 90px; font-weight: 900; color: #fff; text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="8"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="hook" class="clip" data-start="0" data-duration="3" data-track-index="1">
+        <div class="hook-text">Le sommeil est votre <span class="accent">super-pouvoir</span></div>
+      </div>
+
+      <div id="metaphor" class="clip" data-start="3" data-duration="3.5" data-track-index="1">
+        <div class="metaphor-stage">
+          <div class="battery"><div class="battery-fill" id="fill"></div></div>
+          <div class="battery-label" id="pct">0%</div>
+        </div>
+      </div>
+
+      <div id="cta" class="clip" data-start="6.5" data-duration="1.5" data-track-index="1">
+        <div class="cta-text">8 heures. Chaque nuit.</div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const pct = { v: 0 };
+
+      tl.from("#hook .hook-text", { opacity: 0, y: 60, duration: 0.8, ease: "power3.out" }, 0)
+        .to("#hook .hook-text", { opacity: 0, y: -40, duration: 0.4, ease: "power2.in" }, 2.5)
+        .from(".battery", { scale: 0.7, opacity: 0, duration: 0.6, ease: "back.out(1.7)" }, 3.1)
+        .to("#fill", { width: "92%", duration: 2, ease: "power1.inOut" }, 3.6)
+        .to(pct, {
+          v: 100, duration: 2, ease: "power1.inOut",
+          onUpdate: () => {
+            const el = document.getElementById("pct");
+            if (el) el.textContent = Math.round(pct.v) + "%";
+          },
+        }, 3.6)
+        .from("#cta .cta-text", { opacity: 0, scale: 0.9, duration: 0.6, ease: "power3.out" }, 6.6);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

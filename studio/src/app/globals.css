@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --color-night: #05070f;
+  --color-night-2: #0b1022;
+  --color-night-3: #131a3d;
+  --color-ink: #f8fafc;
+  --color-mist: #94a3b8;
+  --color-accent: #818cf8;
+  --color-accent-2: #38bdf8;
+  --color-card: rgba(255, 255, 255, 0.05);
+  --color-edge: rgba(255, 255, 255, 0.12);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-inter), ui-sans-serif, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 120% 70% at 30% -10%, #131a3d 0%, transparent 60%),
+    #05070f;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* Focus visible — accessibilité clavier */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: rgba(129, 140, 248, 0.35);
+}
+
+/* ————— Animations du faux player (hero) ————— */
+
+@keyframes cf-scene {
+  0%, 4% { opacity: 0; transform: translateY(14px) scale(0.98); }
+  8%, 30% { opacity: 1; transform: translateY(0) scale(1); }
+  34%, 100% { opacity: 0; transform: translateY(-10px) scale(0.99); }
+}
+
+@keyframes cf-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes cf-chip {
+  0%, 4% { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+  8%, 30% { background: rgba(129, 140, 248, 0.22); border-color: rgba(129, 140, 248, 0.55); }
+  34%, 100% { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); }
+}
+
+@keyframes cf-fill {
+  0%, 8% { width: 4%; }
+  26%, 100% { width: 88%; }
+}
+
+@keyframes cf-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.cf-scene {
+  animation: cf-scene 9s infinite;
+  will-change: opacity, transform;
+}
+.cf-scene-2 { animation-delay: 3s; }
+.cf-scene-3 { animation-delay: 6s; }
+
+.cf-chip { animation: cf-chip 9s infinite; }
+.cf-chip-2 { animation-delay: 3s; }
+.cf-chip-3 { animation-delay: 6s; }
+
+.cf-progress {
+  transform-origin: left;
+  animation: cf-progress 9s linear infinite;
+}
+
+.cf-fill { animation: cf-fill 9s infinite; }
+
+.cf-float { animation: cf-float 7s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .cf-scene, .cf-chip, .cf-progress, .cf-fill, .cf-float {
+    animation: none;
+  }
+  .cf-scene { opacity: 0; }
+  .cf-scene-1 { opacity: 1; transform: none; }
+  .cf-progress { transform: scaleX(0.4); }
+  .cf-fill { width: 60%; }
+}
