@@ -26,6 +26,7 @@ export function StudioApp() {
   const [html, setHtml] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
+  const [captions, setCaptions] = useState(false);
 
   const buildBrief = useCallback(
     (seed?: number): Brief => ({
@@ -66,9 +67,9 @@ export function StudioApp() {
   // Recompile la preview avec un debounce à chaque édition du storyboard.
   useEffect(() => {
     if (!storyboard) return;
-    const timer = window.setTimeout(() => setHtml(compileStoryboard(storyboard)), 300);
+    const timer = window.setTimeout(() => setHtml(compileStoryboard(storyboard, { captions })), 300);
     return () => window.clearTimeout(timer);
-  }, [storyboard]);
+  }, [storyboard, captions]);
 
   // Raccourci ⌘/Ctrl + Entrée → générer.
   useEffect(() => {
@@ -135,7 +136,18 @@ export function StudioApp() {
           {storyboard && html ? (
             <>
               <section aria-label="Prévisualisation" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                <h2 className="mb-4 text-base font-semibold text-white">2 · Prévisualisez</h2>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="text-base font-semibold text-white">2 · Prévisualisez</h2>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={captions}
+                      onChange={(e) => setCaptions(e.target.checked)}
+                      className="h-4 w-4 accent-indigo-500"
+                    />
+                    Sous-titres (narration)
+                  </label>
+                </div>
                 <PreviewPlayer
                   html={html}
                   width={storyboard.width}

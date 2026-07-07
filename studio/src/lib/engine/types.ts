@@ -145,6 +145,8 @@ export interface CompileOptions {
   gsap?: { mode: "cdn" } | { mode: "inline"; source: string };
   /** Inclure le runtime de contrôle postMessage (preview player) */
   playerRuntime?: boolean;
+  /** Afficher la narration en sous-titres (piste dédiée) */
+  captions?: boolean;
 }
 
 export const ASPECT_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {

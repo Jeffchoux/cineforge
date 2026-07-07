@@ -17,7 +17,8 @@ export function compileStoryboard(storyboard: Storyboard, options: CompileOption
   const unit = Math.min(width, height) / 100;
 
   const rendered = storyboard.scenes.map((scene) => renderScene(scene));
-  const scenesHtml = rendered.map((r) => r.html).join("\n\n");
+  const captionsHtml = options.captions ? buildCaptions(storyboard) : "";
+  const scenesHtml = rendered.map((r) => r.html).join("\n\n") + captionsHtml;
   const scenesTimeline = rendered.map((r) => r.timeline).join("\n");
 
   const gsapTag =
@@ -26,13 +27,13 @@ export function compileStoryboard(storyboard: Storyboard, options: CompileOption
       : `<script src="${GSAP_CDN}"></script>`;
 
   const fontLink = theme.fontLink
-    ? `<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="${theme.fontLink}" />`
+    ? `<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="${escapeHtml(theme.fontLink)}" />`
     : "";
 
   const playerRuntime = options.playerRuntime === false ? "" : buildPlayerRuntime(durationSec);
 
   return `<!doctype html>
-<html lang="${storyboard.brief.language}">
+<html lang="${escapeHtml(storyboard.brief.language)}">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=${width}, height=${height}" />
@@ -107,6 +108,23 @@ function buildPlayerRuntime(durationSec: number): string {
   else window.addEventListener("load", boot);
 })();
 </script>`;
+}
+
+/**
+ * Piste de sous-titres optionnelle : la narration de chaque scène,
+ * affichée en bas du stage sur une piste dédiée (data-track-index="2").
+ */
+function buildCaptions(storyboard: Storyboard): string {
+  const clips = storyboard.scenes
+    .filter((scene) => scene.narration.trim().length > 0)
+    .map(
+      (scene) => `<div class="clip caption-clip" data-start="${scene.start}" data-duration="${scene.duration}" data-track-index="2">
+  <div class="caption-text">${escapeHtml(scene.narration)}</div>
+</div>`,
+    )
+    .join("\n");
+  if (!clips) return "";
+  return `\n\n<!-- Sous-titres (narration) -->\n${clips}`;
 }
 
 function round3(n: number): number {

@@ -142,13 +142,13 @@ function SceneFields({ scene, onPatch }: { scene: Scene; onPatch: (p: Partial<Sc
             <input id={`t-${scene.id}`} value={scene.title} onChange={(e) => onPatch({ title: e.target.value })} className={fieldClass} />
           </div>
           <div>
-            <label htmlFor={`i-${scene.id}`} className={labelClass}>Étapes (1 par ligne, max 4)</label>
+            <label htmlFor={`i-${scene.id}`} className={labelClass}>Étapes (1 par ligne, max 3)</label>
             <textarea
               id={`i-${scene.id}`}
               rows={3}
               value={scene.items.join("\n")}
               onChange={(e) =>
-                onPatch({ items: e.target.value.split("\n").map((s) => s.trimStart()).filter(Boolean).slice(0, 4) })
+                onPatch({ items: e.target.value.split("\n").map((s) => s.trimStart()).filter(Boolean).slice(0, 3) })
               }
               className={fieldClass}
             />

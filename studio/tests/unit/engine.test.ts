@@ -194,3 +194,51 @@ describe("compilation", () => {
     expect(html).not.toContain("cdn.jsdelivr.net");
   });
 });
+
+describe("whitelist stricte du brief (durcissement sécurité)", () => {
+  it("neutralise language/vibe/aspect/themeId invalides vers des valeurs sûres", () => {
+    const hostile = {
+      ...baseBrief,
+      language: 'fr"><script>alert(1)</script>',
+      vibe: "explosive",
+      aspect: "4:3",
+      themeId: "../../etc/passwd",
+    } as unknown as Brief;
+    const clean = sanitizeBrief(hostile);
+    expect(clean.language).toBe("fr");
+    expect(clean.vibe).toBe("cinematic");
+    expect(clean.aspect).toBe("16:9");
+    expect(clean.themeId).toBeUndefined();
+    // Et la compilation complète reste saine.
+    const html = compileStoryboard(planStoryboard(hostile));
+    expect(html).toContain('lang="fr"');
+    expect(html).not.toContain("<script>alert");
+  });
+
+  it("ignore les points non-string sans lever d'erreur", () => {
+    const brief = { ...baseBrief, points: [42, null, "vrai point", { a: 1 }] } as unknown as Brief;
+    const clean = sanitizeBrief(brief);
+    expect(clean.points).toEqual(["vrai point"]);
+  });
+
+  it("rejette un topic absent ou non-string", () => {
+    expect(() => sanitizeBrief({ ...baseBrief, topic: undefined } as unknown as Brief)).toThrow();
+    expect(() => sanitizeBrief({ ...baseBrief, topic: 123 } as unknown as Brief)).toThrow();
+  });
+});
+
+describe("sous-titres (captions)", () => {
+  it("ajoute une piste de sous-titres échappée quand captions=true", () => {
+    const sb = planStoryboard({ ...baseBrief, topic: "Sujet <b>gras</b>" });
+    const html = compileStoryboard(sb, { captions: true });
+    const count = (html.match(/class="clip caption-clip"/g) ?? []).length;
+    expect(count).toBe(sb.scenes.filter((s) => s.narration.trim()).length);
+    expect(html).toContain('data-track-index="2"');
+    expect(html).not.toContain("<b>gras</b>");
+  });
+
+  it("n'ajoute rien par défaut", () => {
+    const sb = planStoryboard(baseBrief);
+    expect(compileStoryboard(sb)).not.toContain('class="clip caption-clip"');
+  });
+});

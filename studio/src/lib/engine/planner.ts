@@ -1,11 +1,15 @@
 import type {
+  AspectRatio,
   Brief,
   ComparisonScene,
+  Language,
   MetaphorVisual,
   Scene,
   StatScene,
   StepsScene,
   Storyboard,
+  ThemeId,
+  Vibe,
 } from "./types";
 import { ASPECT_DIMENSIONS, BRIEF_LIMITS } from "./types";
 import { createRng, hashString, type Rng } from "./rng";
@@ -20,19 +24,39 @@ const METAPHOR_VISUALS: readonly MetaphorVisual[] = [
   "network",
 ];
 
-/** Nettoie et borne un brief venu de l'extérieur (formulaire ou API). */
+const VALID_LANGUAGES = new Set<Language>(["fr", "en"]);
+const VALID_VIBES = new Set<Vibe>(["cinematic", "minimal", "energetic", "techy", "warm"]);
+const VALID_ASPECTS = new Set<AspectRatio>(["16:9", "9:16", "1:1"]);
+const VALID_THEMES = new Set<ThemeId>(["midnight", "paper", "neon", "broadcast", "pastel"]);
+
+/**
+ * Nettoie et borne un brief venu de l'extérieur (formulaire ou API).
+ * Whitelist stricte de chaque champ — aucune valeur brute ne traverse
+ * vers le compilateur (défense XSS/injection, OWASP A03).
+ */
 export function sanitizeBrief(input: Brief): Brief {
+  if (typeof input?.topic !== "string") throw new Error("Le sujet (topic) est requis.");
   const topic = input.topic.trim().slice(0, BRIEF_LIMITS.topicMax);
   if (!topic) throw new Error("Le sujet (topic) est requis.");
-  const points = (input.points ?? [])
+  const points = (Array.isArray(input.points) ? input.points : [])
+    .filter((p): p is string => typeof p === "string")
     .map((p) => p.trim().slice(0, BRIEF_LIMITS.pointMax))
     .filter(Boolean)
     .slice(0, BRIEF_LIMITS.pointsMax);
   const durationSec = Math.min(
     BRIEF_LIMITS.durationMax,
-    Math.max(BRIEF_LIMITS.durationMin, Math.round(input.durationSec) || 20),
+    Math.max(BRIEF_LIMITS.durationMin, Math.round(Number(input.durationSec)) || 20),
   );
-  return { ...input, topic, points, durationSec };
+  return {
+    topic,
+    points,
+    durationSec,
+    language: VALID_LANGUAGES.has(input.language) ? input.language : "fr",
+    vibe: VALID_VIBES.has(input.vibe) ? input.vibe : "cinematic",
+    aspect: VALID_ASPECTS.has(input.aspect) ? input.aspect : "16:9",
+    themeId: input.themeId && VALID_THEMES.has(input.themeId) ? input.themeId : undefined,
+    seed: Number.isFinite(input.seed) ? Math.floor(input.seed as number) : undefined,
+  };
 }
 
 interface Beat {

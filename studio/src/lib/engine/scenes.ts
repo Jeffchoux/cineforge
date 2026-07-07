@@ -97,6 +97,15 @@ export const SCENE_CSS = `
 .cta-title { font-family: var(--font-head); font-size: calc(var(--u) * 10); font-weight: 900; color: var(--ink); letter-spacing: -0.02em; }
 .cta-subtitle { font-family: var(--font-body); font-size: calc(var(--u) * 4); color: var(--muted); }
 .cta-bar { width: calc(var(--u) * 24); height: calc(var(--u) * 1.2); border-radius: calc(var(--u) * 0.6); background: linear-gradient(90deg, var(--accent), var(--accent2)); transform-origin: left; }
+
+.caption-clip { display: block; pointer-events: none; }
+.caption-text {
+  position: absolute; left: 50%; bottom: calc(var(--u) * 5); transform: translateX(-50%);
+  max-width: 84%; padding: calc(var(--u) * 1.2) calc(var(--u) * 2.4);
+  background: rgba(0,0,0,0.55); border-radius: calc(var(--u) * 1);
+  font-family: var(--font-body); font-size: calc(var(--u) * 2.8); font-weight: 600;
+  color: #fff; text-align: center; line-height: 1.35;
+}
 `;
 
 function sel(id: string): string {

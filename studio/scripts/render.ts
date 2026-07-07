@@ -104,10 +104,10 @@ function briefFromArgs(args: Map<string, string>): Brief {
   };
 }
 
-async function renderStoryboard(storyboard: Storyboard, outPath: string): Promise<void> {
+async function renderStoryboard(storyboard: Storyboard, outPath: string, captions = false): Promise<void> {
   const { width, height, fps, durationSec } = storyboard;
   const totalFrames = Math.round(durationSec * fps);
-  const html = compileStoryboard(storyboard);
+  const html = compileStoryboard(storyboard, { captions });
 
   mkdirSync(dirname(outPath), { recursive: true });
 
@@ -139,9 +139,18 @@ async function renderStoryboard(storyboard: Storyboard, outPath: string): Promis
     ffmpegStderr += chunk.toString();
     if (ffmpegStderr.length > 20_000) ffmpegStderr = ffmpegStderr.slice(-10_000);
   });
+  // Sans listener 'error', un EPIPE (ffmpeg mort pendant un write) ferait
+  // planter tout le process au lieu d'échouer proprement.
+  let ffmpegDead = false;
+  ffmpeg.stdin.on("error", () => {
+    ffmpegDead = true;
+  });
   const ffmpegExit = new Promise<number>((resolveExit, rejectExit) => {
     ffmpeg.on("error", rejectExit);
-    ffmpeg.on("close", (code) => resolveExit(code ?? -1));
+    ffmpeg.on("close", (code) => {
+      ffmpegDead = true;
+      resolveExit(code ?? -1);
+    });
   });
 
   try {
@@ -206,10 +215,28 @@ async function renderStoryboard(storyboard: Storyboard, outPath: string): Promis
       await page.evaluate((time) => {
         (window as unknown as { __cfSeek: (t: number) => void }).__cfSeek(time);
       }, t);
+      if (ffmpegDead) {
+        throw new Error(`ffmpeg s'est arrêté prématurément à la frame ${frame}/${totalFrames}.\n${ffmpegStderr.slice(-2_000)}`);
+      }
       const png = await page.screenshot({ type: "png" });
       const canContinue = ffmpeg.stdin.write(png);
       if (!canContinue) {
-        await new Promise<void>((resolveDrain) => ffmpeg.stdin.once("drain", resolveDrain));
+        // Attente du drain bornée : si ffmpeg meurt entre-temps, le drain
+        // n'arrivera jamais — on sort au lieu de bloquer indéfiniment.
+        await new Promise<void>((resolveDrain, rejectDrain) => {
+          const timer = setTimeout(
+            () => rejectDrain(new Error(`ffmpeg ne consomme plus les frames (frame ${frame}).\n${ffmpegStderr.slice(-2_000)}`)),
+            30_000,
+          );
+          ffmpeg.stdin.once("drain", () => {
+            clearTimeout(timer);
+            resolveDrain();
+          });
+          ffmpeg.once("close", () => {
+            clearTimeout(timer);
+            rejectDrain(new Error(`ffmpeg s'est arrêté pendant l'encodage (frame ${frame}).\n${ffmpegStderr.slice(-2_000)}`));
+          });
+        });
       }
       if ((frame + 1) % 30 === 0 || frame + 1 === totalFrames) {
         const pct = Math.round(((frame + 1) / totalFrames) * 100);
@@ -246,7 +273,8 @@ async function main(): Promise<void> {
 
   const defaultName = `${storyboard.id}.mp4`;
   const outPath = resolve(args.get("out") ?? `renders/${defaultName}`);
-  await renderStoryboard(storyboard, outPath);
+  const captions = args.get("captions") === "true" || args.get("captions") === "";
+  await renderStoryboard(storyboard, outPath, captions);
 }
 
 main().catch((error) => {

@@ -90,6 +90,23 @@ interface AiScene {
   subtitle?: string;
 }
 
+const MAX_BODY_BYTES = 50_000;
+const RATE_LIMIT = { windowMs: 60_000, max: 10 };
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+/** Rate limiting best-effort par IP (mémoire locale de l'instance). */
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const bucket = rateBuckets.get(ip);
+  if (!bucket || now > bucket.resetAt) {
+    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT.windowMs });
+    if (rateBuckets.size > 10_000) rateBuckets.clear();
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > RATE_LIMIT.max;
+}
+
 export async function POST(request: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
     return NextResponse.json(
@@ -98,16 +115,29 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+  }
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
+  }
+
+  // Validation + storyboard heuristique de base (timings, thème, dimensions).
   let brief: Brief;
+  let base: Storyboard;
   try {
-    const body = await request.json();
+    const raw = await request.text();
+    if (raw.length > MAX_BODY_BYTES) {
+      return NextResponse.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
+    }
+    const body = JSON.parse(raw);
     brief = sanitizeBrief(body?.brief as Brief);
+    base = planStoryboard(brief);
   } catch {
     return NextResponse.json({ error: "INVALID_BRIEF" }, { status: 400 });
   }
-
-  // Le storyboard heuristique sert de base : timings, thème, dimensions.
-  const base = planStoryboard(brief);
 
   try {
     const client = new Anthropic();
@@ -175,14 +205,14 @@ function mergeAiScenes(base: Storyboard, ai: { title: string; scenes: AiScene[] 
       case "metaphor":
         return { ...common, type: "metaphor", visual: s.visual ?? "growth", label: s.label ?? "", caption: s.caption ?? s.narration };
       case "stat":
-        return { ...common, type: "stat", value: s.value ?? 0, prefix: s.prefix, suffix: s.suffix, label: s.statLabel ?? s.narration };
+        return { ...common, type: "stat", value: clampNumber(s.value, 0, 1_000_000_000), prefix: s.prefix?.slice(0, 4), suffix: s.suffix?.slice(0, 6), label: s.statLabel ?? s.narration };
       case "steps":
         return { ...common, type: "steps", title: s.title ?? "", items: (s.items ?? []).slice(0, 3) };
       case "comparison":
         return {
           ...common, type: "comparison", title: s.title ?? "",
           leftLabel: s.leftLabel ?? "A", rightLabel: s.rightLabel ?? "B",
-          leftValue: s.leftValue ?? 30, rightValue: s.rightValue ?? 90,
+          leftValue: clampNumber(s.leftValue ?? 30, 0, 100), rightValue: clampNumber(s.rightValue ?? 90, 0, 100),
         };
       case "quote":
         return { ...common, type: "quote", text: s.text ?? s.narration, author: s.author };
@@ -198,6 +228,12 @@ function mergeAiScenes(base: Storyboard, ai: { title: string; scenes: AiScene[] 
 
 function clampDur(n: number | undefined): number {
   return Math.min(10, Math.max(1.5, Number(n) || 4));
+}
+
+function clampNumber(n: number | undefined, min: number, max: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return min;
+  return Math.min(max, Math.max(min, v));
 }
 
 function round2(n: number): number {
