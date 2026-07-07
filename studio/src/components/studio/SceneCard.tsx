@@ -22,6 +22,7 @@ export function SceneCard({ scene, index, isActive, onChange, onSelect }: SceneC
 
   return (
     <article
+      data-testid="scene-card"
       onClick={onSelect}
       className={`flex w-72 flex-none cursor-pointer flex-col gap-3 rounded-xl border p-4 transition-colors sm:w-80 ${
         isActive ? "border-indigo-400/60 bg-indigo-500/10" : "border-white/10 bg-white/[0.03] hover:border-white/25"

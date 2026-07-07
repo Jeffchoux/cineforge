@@ -76,6 +76,14 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
     return () => cancelAnimationFrame(rafRef.current);
   }, [playing, duration, seek]);
 
+  // Nouvelle compilation → l'iframe recharge, on attend son cf:ready.
+  // (ajustement d'état pendant le rendu, pattern recommandé par React)
+  const [lastHtml, setLastHtml] = useState(html);
+  if (html !== lastHtml) {
+    setLastHtml(html);
+    setReady(false);
+  }
+
   // Si la durée raccourcit (édition), on recale la position.
   useEffect(() => {
     if (timeRef.current > duration) seek(duration);
@@ -146,7 +154,6 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
                 transform: `scale(${scale})`,
                 transformOrigin: "top left",
               }}
-              onLoad={() => setReady(false)}
             />
           )}
           {!ready && (
