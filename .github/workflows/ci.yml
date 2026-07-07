@@ -42,3 +42,29 @@ jobs:
       - run: npm run test:e2e
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+  render-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # Le cœur du produit : un vrai MP4 doit sortir du pipeline.
+      - run: |
+          npm run render -- --topic "Smoke test CI" --duration 6 --vibe minimal \
+            --aspect 16:9 --lang fr --seed 1 --captions --out renders/smoke.mp4
+      - run: |
+          ffprobe -v error -show_entries format=duration -show_entries stream=width,height,codec_name \
+            -of default=noprint_wrappers=1 renders/smoke.mp4 | tee /tmp/probe.txt
+          grep -q "codec_name=h264" /tmp/probe.txt
+          grep -q "width=1920" /tmp/probe.txt
+          grep -q "duration=6" /tmp/probe.txt

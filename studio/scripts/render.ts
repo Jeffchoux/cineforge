@@ -16,6 +16,7 @@ import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
 import {
   compileStoryboard,
+  sanitizeStoryboard,
   planStoryboard,
   type AspectRatio,
   type Brief,
@@ -77,15 +78,14 @@ function loadStoryboard(path: string): Storyboard {
     fail(`JSON invalide dans ${path}`);
   }
   if (!isRecord(data)) fail(`Storyboard invalide (${path}) : objet JSON attendu.`);
-  const sb = data as Partial<Storyboard>;
-  const problems: string[] = [];
-  if (!Array.isArray(sb.scenes) || sb.scenes.length === 0) problems.push("scenes manquantes ou vides");
-  if (typeof sb.durationSec !== "number" || sb.durationSec <= 0) problems.push("durationSec invalide");
-  if (typeof sb.width !== "number" || typeof sb.height !== "number") problems.push("width/height invalides");
-  if (typeof sb.fps !== "number" || sb.fps <= 0) problems.push("fps invalide");
-  if (typeof sb.theme !== "string") problems.push("theme manquant");
-  if (problems.length > 0) fail(`Storyboard invalide (${path}) : ${problems.join(", ")}.`);
-  return sb as Storyboard;
+  // Validation de frontière complète : nombres coercés, enums whitelistés,
+  // ids régénérés — aucun contenu du JSON ne peut injecter du JS dans la
+  // composition compilée.
+  try {
+    return sanitizeStoryboard(data);
+  } catch (error) {
+    fail(`Storyboard invalide (${path}) : ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function briefFromArgs(args: Map<string, string>): Brief {

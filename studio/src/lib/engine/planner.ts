@@ -126,7 +126,9 @@ export function planStoryboard(rawBrief: Brief): Storyboard {
     beats = brief.points.map((text) => ({ text, kind: classifyPoint(text) }));
   } else {
     const count = Math.max(1, Math.min(4, Math.floor(middleDur / 4)));
-    const kinds: Beat["kind"][] = ["metaphor", "stat", "steps", "quote"];
+    // Pas de "stat" générique : on n'invente jamais de chiffre — les scènes
+    // statistiques n'apparaissent que si un point clé en contient un.
+    const kinds: Beat["kind"][] = ["metaphor", "steps", "quote", "metaphor"];
     beats = Array.from({ length: count }, (_, i) => ({ text: topic, kind: kinds[i % kinds.length] }));
   }
   // Durée par beat, bornée pour rester lisible

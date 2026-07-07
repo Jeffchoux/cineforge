@@ -68,6 +68,10 @@ body {
 }
 
 .cf-scene {
+  /* opacity 0 de base : pendant l'animation-delay des scènes 2 et 3,
+     l'animation n'est pas encore appliquée — sans cela elles restent
+     visibles et se superposent à la scène 1 au chargement. */
+  opacity: 0;
   animation: cf-scene 9s infinite;
   will-change: opacity, transform;
 }

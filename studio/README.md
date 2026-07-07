@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CineForge Studio — application
 
-## Getting Started
+L'application Next.js de [CineForge](../README.md) : landing page, studio de création, moteur de génération et renderer MP4.
 
-First, run the development server:
+## Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+src/lib/engine/        Le moteur (TypeScript pur, zéro dépendance runtime)
+  types.ts             Brief, Scene (union discriminée), Storyboard, thèmes
+  planner.ts           Brief → Storyboard (heuristique déterministe seedée)
+  compiler.ts          Storyboard → composition HTML (contrat HyperFrames)
+  scenes.ts            Templates des 7 types de scènes (HTML + timelines GSAP)
+  themes.ts            5 systèmes de design complets
+  ai.ts                Fusion des storyboards écrits par Claude (mode IA)
+  sanitize-storyboard.ts  Validation de frontière pour JSON non fiables
+src/app/
+  page.tsx             Landing
+  studio/              Le studio (client) : brief → storyboard → preview → export
+  api/generate/        Mode IA (Claude, structured outputs, repli 501)
+src/components/studio/ BriefForm, SceneCard, PreviewPlayer, Timeline, ExportPanel
+scripts/render.ts      Rendu MP4 : Playwright (frame par frame) + FFmpeg
+tests/                 unit/ (Vitest) et e2e/ (Playwright, desktop + mobile)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Commandes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev          # http://localhost:3000
+npm run build        # build de production
+npm run typecheck    # tsc --noEmit
+npm test             # tests unitaires (Vitest)
+npm run test:e2e     # tests E2E (Playwright)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Rendu MP4 local (prérequis : ffmpeg + npx playwright install chromium)
+npm run render -- --topic "Mon sujet" --duration 20 --vibe cinematic \
+  --aspect 16:9 --lang fr [--captions] [--seed 42]
+npm run render -- --storyboard mon-storyboard.json --out renders/ma-video.mp4
+```
 
-## Learn More
+## Mode IA
 
-To learn more about Next.js, take a look at the following resources:
+`POST /api/generate` avec `{ "brief": {...} }` fait écrire le storyboard par Claude
+(`claude-opus-4-8`, structured outputs). Nécessite `ANTHROPIC_API_KEY` côté serveur ;
+sans clé la route répond 501 et le studio bascule automatiquement sur le planificateur
+heuristique local. Limites : body 50 KB, 10 requêtes/min/IP.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Contrat de composition
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Les compositions générées sont conformes à [HyperFrames](https://github.com/heygen-com/hyperframes) :
+clips avec `data-start`/`data-duration`/`data-track-index`, timeline GSAP en pause
+enregistrée sur `window.__timelines["main"]`, seek-safe. Elles peuvent donc aussi être
+rendues par `npx hyperframes render`.

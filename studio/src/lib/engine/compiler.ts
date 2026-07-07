@@ -1,7 +1,8 @@
-import type { CompileOptions, Storyboard } from "./types";
+import type { CompileOptions, Storyboard, Theme } from "./types";
 import { THEMES } from "./themes";
 import { SCENE_CSS, renderScene } from "./scenes";
 import { escapeHtml } from "./escape";
+import { createRng, hashString } from "./rng";
 
 const GSAP_CDN = "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js";
 
@@ -18,8 +19,11 @@ export function compileStoryboard(storyboard: Storyboard, options: CompileOption
 
   const rendered = storyboard.scenes.map((scene) => renderScene(scene));
   const captionsHtml = options.captions ? buildCaptions(storyboard) : "";
-  const scenesHtml = rendered.map((r) => r.html).join("\n\n") + captionsHtml;
+  const backdrop = buildBackdrop(storyboard, theme);
+  const scenesHtml = backdrop + rendered.map((r) => r.html).join("\n\n") + captionsHtml;
   const scenesTimeline = rendered.map((r) => r.timeline).join("\n");
+  const aspectClass =
+    width > height ? "aspect-landscape" : width < height ? "aspect-portrait" : "aspect-square";
 
   const gsapTag =
     options.gsap?.mode === "inline"
@@ -61,7 +65,7 @@ ${SCENE_CSS}
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="main" data-start="0" data-duration="${durationSec}" data-width="${width}" data-height="${height}" data-fps="${fps}">
+<div id="root" class="${aspectClass}" data-composition-id="main" data-start="0" data-duration="${durationSec}" data-width="${width}" data-height="${height}" data-fps="${fps}">
 ${scenesHtml}
 </div>
 <script>
@@ -108,6 +112,46 @@ function buildPlayerRuntime(durationSec: number): string {
   else window.addEventListener("load", boot);
 })();
 </script>`;
+}
+
+const DARK_THEMES = new Set(["midnight", "neon", "broadcast"]);
+const PATTERN_THEMES = new Set(["broadcast", "neon"]);
+
+/**
+ * Décor de fond cinématographique : blobs flous aux couleurs du thème
+ * (positions déterministes dérivées de la seed du storyboard), vignette
+ * sur les thèmes sombres, motif discret sur broadcast/neon. Toujours
+ * visible, sous les scènes — la composition ne paraît jamais vide.
+ */
+function buildBackdrop(storyboard: Storyboard, theme: Theme): string {
+  const rng = createRng(storyboard.brief.seed ?? hashString(storyboard.id));
+  const dark = DARK_THEMES.has(theme.id);
+  const blobOpacity = dark ? 0.11 : 0.08;
+
+  const blobs = [theme.accent, theme.accent2, theme.accent]
+    .map((color, i) => {
+      const size = 34 + rng.int(22);
+      const left = 4 + rng.int(70);
+      const top = 4 + rng.int(64);
+      return `<div class="backdrop-blob" style="width: calc(var(--u) * ${size}); height: calc(var(--u) * ${size}); left: ${left}%; top: ${top}%; background: radial-gradient(circle, ${color} 0%, transparent 70%); opacity: ${i === 2 ? blobOpacity / 2 : blobOpacity};"></div>`;
+    })
+    .join("\n  ");
+
+  const vignette = dark
+    ? `<div class="backdrop-vignette" style="background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(0,0,0,0.38) 100%);"></div>`
+    : `<div class="backdrop-vignette" style="background: radial-gradient(ellipse at 50% 45%, transparent 60%, rgba(15,23,42,0.07) 100%);"></div>`;
+
+  const pattern = PATTERN_THEMES.has(theme.id)
+    ? `<div class="backdrop-pattern" style="background-image: linear-gradient(${theme.ink} 1px, transparent 1px), linear-gradient(90deg, ${theme.ink} 1px, transparent 1px); background-size: calc(var(--u) * 8) calc(var(--u) * 8); opacity: 0.04;"></div>`
+    : "";
+
+  return `<div class="backdrop" aria-hidden="true">
+  ${blobs}
+  ${pattern}
+  ${vignette}
+</div>
+
+`;
 }
 
 /**

@@ -17,8 +17,14 @@ export interface SceneRender {
 
 /** CSS partagé par tous les types de scènes (paramétré par variables de thème). */
 export const SCENE_CSS = `
-.clip { position: absolute; inset: 0; display: grid; place-items: center; visibility: hidden; }
-.scene-inner { display: grid; place-items: center; gap: calc(var(--u) * 3); padding: calc(var(--u) * 8); text-align: center; max-width: 92%; }
+.backdrop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.backdrop-blob { position: absolute; border-radius: 50%; filter: blur(calc(var(--u) * 7)); }
+.backdrop-vignette { position: absolute; inset: 0; }
+.backdrop-pattern { position: absolute; inset: 0; }
+
+.clip { position: absolute; inset: 0; display: grid; place-items: center; visibility: hidden; z-index: 1; }
+.scene-inner { display: grid; place-items: center; gap: calc(var(--u) * 3); padding: calc(var(--u) * 8); text-align: center; width: 92%; }
+.scene-inner > * { overflow-wrap: break-word; min-width: 0; max-width: 100%; }
 
 .kicker {
   font-family: var(--font-body); font-size: calc(var(--u) * 2.6); font-weight: 600;
@@ -27,6 +33,7 @@ export const SCENE_CSS = `
 .hook-title {
   font-family: var(--font-head); font-size: calc(var(--u) * 9); font-weight: 800;
   color: var(--ink); line-height: 1.12; letter-spacing: -0.02em; max-width: 88%;
+  overflow-wrap: break-word; hyphens: none;
 }
 .hook-title .accent { color: var(--accent); }
 
@@ -106,11 +113,37 @@ export const SCENE_CSS = `
   font-family: var(--font-body); font-size: calc(var(--u) * 2.8); font-weight: 600;
   color: #fff; text-align: center; line-height: 1.35;
 }
+
+/* Densification 16:9 : la hauteur limite --u, on regagne la largeur. */
+.aspect-landscape .stat-value { font-size: calc(var(--u) * 22); }
+.aspect-landscape .stat-label { font-size: calc(var(--u) * 4); max-width: 62%; }
+.aspect-landscape .visual-stage { transform: scale(1.15); }
+.aspect-landscape .metaphor-caption { max-width: 56%; font-size: calc(var(--u) * 3.5); }
+.aspect-landscape .steps-list { width: min(64%, calc(var(--u) * 118)); }
+.aspect-landscape .comp-rows { width: min(60%, calc(var(--u) * 124)); }
+.aspect-landscape .hook-title { max-width: 78%; }
+.aspect-landscape .quote-text { max-width: 70%; }
+.aspect-portrait .scene-inner { padding: calc(var(--u) * 5); }
 `;
 
 function sel(id: string): string {
   // Les ids sont générés par le planner (scene-N) — on garde une garde simple.
   return `#${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+}
+
+/**
+ * Auto-fit déterministe : la taille de police descend par paliers avec la
+ * longueur du texte, pour qu'aucun titre ne déborde du cadre.
+ */
+function fitFontSize(length: number, steps: [number, number][], fallback: number): number {
+  for (const [maxLen, size] of steps) {
+    if (length <= maxLen) return size;
+  }
+  return fallback;
+}
+
+function fitStyle(length: number, steps: [number, number][], fallback: number): string {
+  return ` style="font-size: calc(var(--u) * ${fitFontSize(length, steps, fallback)})"`;
 }
 
 /** Enveloppe standard d'un clip HyperFrames. */
@@ -135,7 +168,8 @@ function renderHook(scene: Extract<Scene, { type: "hook" }>): SceneRender {
     title = title.replace(word, `<span class="accent">${word}</span>`);
   }
   const kicker = scene.kicker ? `<div class="kicker">${escapeHtml(scene.kicker)}</div>` : "";
-  const html = clip(scene, `${kicker}<h1 class="hook-title">${title}</h1>`);
+  const fit = fitStyle(scene.title.length, [[30, 9], [60, 7.5], [100, 6.2]], 5.2);
+  const html = clip(scene, `${kicker}<h1 class="hook-title"${fit}>${title}</h1>`);
   const s = sel(scene.id);
   const end = scene.start + scene.duration;
   const timeline = `${enterExit(scene.id, scene.start, end)}
@@ -245,7 +279,7 @@ function renderComparison(scene: Extract<Scene, { type: "comparison" }>): SceneR
   const clampPct = (v: number) => Math.max(4, Math.min(100, Math.round(v)));
   const html = clip(
     scene,
-    `<div class="comp-title">${escapeHtml(scene.title)}</div>
+    `<div class="comp-title"${fitStyle(scene.title.length, [[60, 5], [120, 4.2]], 3.6)}>${escapeHtml(scene.title)}</div>
 <div class="comp-rows">
   <div class="comp-row"><div class="comp-label">${escapeHtml(scene.leftLabel)}</div><div class="comp-track"><div class="comp-fill left"></div></div></div>
   <div class="comp-row"><div class="comp-label">${escapeHtml(scene.rightLabel)}</div><div class="comp-track"><div class="comp-fill right"></div></div></div>
@@ -261,7 +295,8 @@ tl.to("${s} .comp-fill.right", { width: "${clampPct(scene.rightValue)}%", durati
 
 function renderQuote(scene: Extract<Scene, { type: "quote" }>): SceneRender {
   const author = scene.author ? `<div class="quote-author">— ${escapeHtml(scene.author)}</div>` : "";
-  const html = clip(scene, `<div class="quote-mark">“</div><div class="quote-text">${escapeHtml(scene.text)}</div>${author}`);
+  const fit = fitStyle(scene.text.length, [[80, 6], [140, 5]], 4.2);
+  const html = clip(scene, `<div class="quote-mark">“</div><div class="quote-text"${fit}>${escapeHtml(scene.text)}</div>${author}`);
   const s = sel(scene.id);
   const end = scene.start + scene.duration;
   const timeline = `${enterExit(scene.id, scene.start, end)}
@@ -271,7 +306,8 @@ tl.fromTo("${s} .quote-text", { scale: 0.96 }, { scale: 1, duration: ${Math.max(
 
 function renderCta(scene: Extract<Scene, { type: "cta" }>): SceneRender {
   const subtitle = scene.subtitle ? `<div class="cta-subtitle">${escapeHtml(scene.subtitle)}</div>` : "";
-  const html = clip(scene, `<div class="cta-title">${escapeHtml(scene.title)}</div><div class="cta-bar"></div>${subtitle}`);
+  const fit = fitStyle(scene.title.length, [[22, 10], [45, 8]], 6.4);
+  const html = clip(scene, `<div class="cta-title"${fit}>${escapeHtml(scene.title)}</div><div class="cta-bar"></div>${subtitle}`);
   const s = sel(scene.id);
   const end = scene.start + scene.duration;
   const timeline = `${enterExit(scene.id, scene.start, end)}

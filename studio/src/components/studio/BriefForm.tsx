@@ -12,12 +12,17 @@ export interface BriefFormState {
   aspect: AspectRatio;
   themeId: ThemeId | "auto";
   language: Language;
+  /** Faire écrire le script par l'IA via /api/generate (repli heuristique automatique) */
+  useAi: boolean;
 }
 
 interface BriefFormProps {
   value: BriefFormState;
   error: string | null;
   hasStoryboard: boolean;
+  /** null = pas de génération IA en cours ; sinon message d'état à afficher */
+  aiStatus: string | null;
+  generating: boolean;
   onChange: (next: BriefFormState) => void;
   onGenerate: () => void;
   onVariation: () => void;
@@ -33,7 +38,7 @@ const ASPECTS: { id: AspectRatio; label: string }[] = [
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30";
 
-export function BriefForm({ value, error, hasStoryboard, onChange, onGenerate, onVariation }: BriefFormProps) {
+export function BriefForm({ value, error, hasStoryboard, aiStatus, generating, onChange, onGenerate, onVariation }: BriefFormProps) {
   const set = <K extends keyof BriefFormState>(key: K, v: BriefFormState[K]) =>
     onChange({ ...value, [key]: v });
 
@@ -200,6 +205,23 @@ export function BriefForm({ value, error, hasStoryboard, onChange, onGenerate, o
         </select>
       </div>
 
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+        <input
+          type="checkbox"
+          checked={value.useAi}
+          onChange={(e) => set("useAi", e.target.checked)}
+          className="h-4 w-4 accent-indigo-500"
+        />
+        Écrire le script avec l&apos;IA
+        <span className="text-xs text-slate-500">(repli local automatique)</span>
+      </label>
+
+      {aiStatus && (
+        <p role="status" className="rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-2 text-sm text-indigo-200">
+          {aiStatus}
+        </p>
+      )}
+
       {error && (
         <p role="alert" className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
           {error}
@@ -209,9 +231,10 @@ export function BriefForm({ value, error, hasStoryboard, onChange, onGenerate, o
       <div className="flex gap-2">
         <button
           type="submit"
-          className="flex-1 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          disabled={generating}
+          className="flex-1 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:cursor-wait disabled:opacity-60"
         >
-          Générer la vidéo
+          {generating ? "Génération…" : "Générer la vidéo"}
         </button>
         {hasStoryboard && (
           <button

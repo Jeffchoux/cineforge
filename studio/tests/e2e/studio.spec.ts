@@ -48,3 +48,40 @@ test.describe("studio", () => {
     expect(consoleErrors).toEqual([]);
   });
 });
+
+test.describe("studio — édition et export", () => {
+  test("éditer une scène recompile la preview, sous-titres et exports fonctionnent", async ({ page }) => {
+    await page.goto("/studio");
+    await fillTopic(page, "Les vertus du batch cooking");
+    await page.getByRole("button", { name: /générer/i }).first().click();
+
+    const iframe = page.locator("iframe").first();
+    await expect(iframe).toBeVisible({ timeout: 20_000 });
+
+    // 1. Édition : changer le titre de la première scène (hook) → la preview recompile.
+    const titleInput = page
+      .locator('[data-testid="scene-card"]')
+      .first()
+      .getByLabel(/titre/i)
+      .first();
+    await titleInput.fill("Titre modifié par le test E2E");
+    await expect
+      .poll(async () => (await iframe.getAttribute("srcdoc")) ?? "", { timeout: 10_000 })
+      .toContain("Titre modifié par le test E2E");
+
+    // 2. Sous-titres : le toggle injecte la piste de narration.
+    await page.getByRole("checkbox", { name: /sous-titres/i }).check();
+    await expect
+      .poll(async () => (await iframe.getAttribute("srcdoc")) ?? "", { timeout: 10_000 })
+      .toContain('class="clip caption-clip"');
+
+    // 3. Export : téléchargement du HTML autonome et du storyboard JSON.
+    const htmlDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: /télécharger html/i }).click();
+    expect((await htmlDownload).suggestedFilename()).toMatch(/\.html$/);
+
+    const jsonDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: /storyboard \.json/i }).click();
+    expect((await jsonDownload).suggestedFilename()).toMatch(/\.json$/);
+  });
+});

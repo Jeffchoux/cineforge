@@ -18,6 +18,7 @@ const DEFAULT_FORM: BriefFormState = {
   aspect: "16:9",
   themeId: "auto",
   language: "fr",
+  useAi: false,
 };
 
 export function StudioApp() {
@@ -27,6 +28,8 @@ export function StudioApp() {
   const [error, setError] = useState<string | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [captions, setCaptions] = useState(false);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   const buildBrief = useCallback(
     (seed?: number): Brief => ({
@@ -47,21 +50,57 @@ export function StudioApp() {
   );
 
   const generate = useCallback(
-    (seed?: number) => {
+    async (seed?: number) => {
+      let next: Storyboard;
       try {
-        const next = planStoryboard(buildBrief(seed));
-        setStoryboard(next);
-        setActiveSceneId(null);
-        setError(null);
+        // Le planner local valide le brief et sert de base (et de repli).
+        next = planStoryboard(buildBrief(seed));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Génération impossible.");
+        return;
       }
+      setError(null);
+      setAiStatus(null);
+
+      if (form.useAi) {
+        setGenerating(true);
+        setAiStatus("L'IA écrit le storyboard…");
+        try {
+          const res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ brief: buildBrief(seed) }),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { storyboard?: Storyboard };
+            if (data.storyboard?.scenes?.length) {
+              next = data.storyboard;
+              setAiStatus("Storyboard écrit par l'IA ✓");
+            } else {
+              setAiStatus("Réponse IA vide — génération locale utilisée.");
+            }
+          } else if (res.status === 501) {
+            setAiStatus("Mode IA non configuré sur ce serveur — génération locale utilisée.");
+          } else if (res.status === 429) {
+            setAiStatus("Trop de requêtes IA — génération locale utilisée.");
+          } else {
+            setAiStatus("IA indisponible — génération locale utilisée.");
+          }
+        } catch {
+          setAiStatus("IA injoignable — génération locale utilisée.");
+        } finally {
+          setGenerating(false);
+        }
+      }
+
+      setStoryboard(next);
+      setActiveSceneId(null);
     },
-    [buildBrief],
+    [buildBrief, form.useAi],
   );
 
   const variation = useCallback(() => {
-    generate(Math.floor(Math.random() * 2 ** 31));
+    void generate(Math.floor(Math.random() * 2 ** 31));
   }, [generate]);
 
   // Recompile la preview avec un debounce à chaque édition du storyboard.
@@ -76,7 +115,7 @@ export function StudioApp() {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        generate();
+        void generate();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -119,20 +158,22 @@ export function StudioApp() {
         {/* Brief — après la preview en mobile, à gauche en desktop */}
         <section
           aria-label="Composer"
-          className="order-2 h-fit rounded-2xl border border-white/10 bg-white/[0.03] p-5 lg:order-1 lg:sticky lg:top-20"
+          className="h-fit rounded-2xl border border-white/10 bg-white/[0.03] p-5 lg:sticky lg:top-20"
         >
           <h2 className="mb-4 text-base font-semibold text-white">1 · Décrivez votre vidéo</h2>
           <BriefForm
             value={form}
             error={error}
             hasStoryboard={storyboard !== null}
+            aiStatus={aiStatus}
+            generating={generating}
             onChange={setForm}
-            onGenerate={() => generate()}
+            onGenerate={() => void generate()}
             onVariation={variation}
           />
         </section>
 
-        <div className="order-1 flex min-w-0 flex-col gap-6 lg:order-2">
+        <div className="flex min-w-0 flex-col gap-6">
           {storyboard && html ? (
             <>
               <section aria-label="Prévisualisation" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">

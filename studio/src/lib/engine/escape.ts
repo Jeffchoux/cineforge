@@ -14,16 +14,3 @@ const HTML_ESCAPES: Record<string, string> = {
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch]);
 }
-
-/**
- * Échappement pour insertion dans une chaîne JS single-quoted
- * à l'intérieur d'un <script> (narration, ids).
- */
-export function escapeJsString(value: string): string {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "")
-    .replace(/<\/script/gi, "<\\/script");
-}

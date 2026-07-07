@@ -49,12 +49,18 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
       if (data?.type === "cf:ready") {
         setReady(true);
         // Après un rechargement (recompilation), on restaure la position.
-        postSeek(Math.min(timeRef.current, duration));
+        // Au tout premier chargement (t=0), on affiche une frame « poster »
+        // à 0,6 s plutôt qu'un fondu encore invisible.
+        if (timeRef.current === 0) {
+          seek(Math.min(0.6, duration / 4));
+        } else {
+          postSeek(Math.min(timeRef.current, duration));
+        }
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [duration, postSeek]);
+  }, [duration, postSeek, seek]);
 
   // Boucle de lecture pilotée par le parent (le document iframe reste passif).
   useEffect(() => {
@@ -179,7 +185,7 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
           <button
             type="button"
             onClick={togglePlay}
-            aria-label={playing ? "Pause" : "Lecture"}
+            aria-label={playing ? "Pause" : time >= duration - 0.05 ? "Rejouer" : "Lecture"}
             className="rounded-lg bg-indigo-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
             {playing ? "⏸ Pause" : time >= duration - 0.05 ? "⟲ Rejouer" : "▶ Lecture"}

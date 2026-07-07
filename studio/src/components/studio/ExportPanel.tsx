@@ -66,9 +66,14 @@ export function ExportPanel({ storyboard, html }: ExportPanelProps) {
           aria-label="Export MP4"
           className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
           onClick={() => setShowMp4Panel(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setShowMp4Panel(false);
+          }}
         >
           <div
-            className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f1e] p-6 shadow-2xl"
+            ref={(el) => el?.focus()}
+            tabIndex={-1}
+            className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b0f1e] p-6 shadow-2xl outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold text-white">Export MP4 (rendu local)</h3>
