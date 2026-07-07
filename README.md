@@ -2,6 +2,8 @@
 
 > **Décrivez. Générez. Diffusez.** Un studio vidéo IA open-source : une phrase devient une vidéo professionnelle — rendue depuis du HTML animé, sans timeline, sans crédits, sans boîte noire.
 
+**Démo en ligne : [cineforge-jeffchouxs-projects.vercel.app](https://cineforge-jeffchouxs-projects.vercel.app)** · [Studio](https://cineforge-jeffchouxs-projects.vercel.app/studio)
+
 ## Qu'est-ce que c'est ?
 
 CineForge transforme un brief (`sujet + durée + vibe`) en **storyboard JSON éditable**, puis en **composition HTML animée** (GSAP, seek-safe), prévisualisable instantanément dans le navigateur et exportable en **MP4 réel** via capture frame par frame (Playwright + FFmpeg).
@@ -57,6 +59,14 @@ npm run typecheck
 ## Types de scènes
 
 `hook` · `metaphor` (battery, orbit, growth, pulse, network) · `stat` (count-up) · `steps` · `comparison` · `quote` · `cta`
+
+## Sous-titres
+
+La narration de chaque scène peut s'afficher en sous-titres (piste HyperFrames dédiée, `data-track-index="2"`) : toggle « Sous-titres » dans le studio, ou `--captions` en CLI. Le champ `narration` du storyboard alimente aussi les futurs modes voix off (TTS).
+
+## Mode IA (optionnel)
+
+Avec `ANTHROPIC_API_KEY` dans l'environnement serveur, `/api/generate` fait écrire le script et les métaphores par Claude (structured outputs). Sans clé, le studio fonctionne intégralement en mode heuristique local — aucune dépendance réseau.
 
 ## Thèmes
 
