@@ -5,6 +5,7 @@ import {
   compileStoryboard,
   planStoryboard,
   sanitizeBrief,
+  sanitizeStoryboard,
   type Brief,
   type Scene,
 } from "../../src/lib/engine";
@@ -91,6 +92,27 @@ describe("sécurité XSS", () => {
     expect(html).not.toContain("<b>résultats</b>");
     // Le texte du point avec balise doit apparaître sous forme échappée (label de stat).
     expect(html).toContain("&lt;b&gt;résultats&lt;/b&gt;");
+  });
+
+  it("échappe une narration hostile venue de la frontière sanitizeStoryboard (sous-titres)", () => {
+    // Un storyboard « importé » (JSON non fiable) dont narration + titre
+    // contiennent des balises : la sortie compilée ne doit créer aucune balise
+    // réelle, y compris sur la piste de sous-titres qui rend la narration.
+    const board = sanitizeStoryboard({
+      title: "<script>alert('title')</script>",
+      brief: { topic: "Frontières de confiance", durationSec: 12, vibe: "minimal", aspect: "16:9", language: "fr" },
+      scenes: [
+        { type: "hook", duration: 3, narration: "<script>alert('narr')</script>" },
+        { type: "quote", duration: 3, narration: "<img src=x onerror=alert(2)>", text: "citation" },
+      ],
+    });
+    const html = compileStoryboard(board, { captions: true });
+    // Aucune balise réelle : les chevrons sont neutralisés (le `<img` reste
+    // inerte car son `<` est échappé), donc pas de `<script>` ni de `<img` bruts.
+    expect(html).not.toContain("<script>alert");
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;script&gt;alert(&#39;narr&#39;)&lt;/script&gt;");
+    expect(html).toContain("&lt;img src=x onerror=alert(2)&gt;");
   });
 });
 
@@ -192,6 +214,15 @@ describe("compilation", () => {
     const html = compileStoryboard(sb, { gsap: { mode: "inline", source: "/* fake gsap */" } });
     expect(html).toContain("/* fake gsap */");
     expect(html).not.toContain("cdn.jsdelivr.net");
+    // Le GSAP inliné n'a pas de balise externe : pas d'attribut integrity.
+    expect(html).not.toContain("integrity=");
+  });
+
+  it("épingle le GSAP CDN avec une intégrité SRI (chaîne d'appro durcie)", () => {
+    const html = compileStoryboard(planStoryboard(baseBrief));
+    expect(html).toContain("cdn.jsdelivr.net/npm/gsap@3.14.2");
+    expect(html).toMatch(/integrity="sha384-[A-Za-z0-9+/]+"/);
+    expect(html).toContain('crossorigin="anonymous"');
   });
 });
 

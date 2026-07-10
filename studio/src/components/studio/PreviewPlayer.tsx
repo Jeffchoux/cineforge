@@ -28,6 +28,10 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
   const [containerWidth, setContainerWidth] = useState(0);
 
   const postSeek = useCallback((t: number) => {
+    // targetOrigin "*" : l'iframe est en sandbox="allow-scripts" (sans
+    // allow-same-origin), son origine est donc opaque ("null") et ne peut
+    // pas être ciblée par une origine nommée. Le message ne porte qu'un
+    // timestamp (aucune donnée sensible) et le document filtre déjà l'émetteur.
     iframeRef.current?.contentWindow?.postMessage({ type: "cf:seek", t }, "*");
   }, []);
 

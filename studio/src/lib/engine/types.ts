@@ -162,3 +162,22 @@ export const BRIEF_LIMITS = {
   durationMin: 6,
   durationMax: 120,
 } as const;
+
+/**
+ * Bornes des champs de scène, source de vérité UNIQUE partagée par les deux
+ * frontières de confiance : la fusion des scènes IA (`mergeAiScenes`, ai.ts)
+ * et la validation d'un storyboard importé (`sanitizeStoryboard`,
+ * sanitize-storyboard.ts). Les deux chemins normalisent les mêmes champs ;
+ * centraliser ces bornes ici garantit qu'elles ne divergent jamais.
+ * (Les champs bornés par BRIEF_LIMITS — narration, hook.title, quote.text,
+ * comparison.title, metaphor.caption — restent référencés via BRIEF_LIMITS.)
+ */
+export const SCENE_FIELD_LIMITS = {
+  hook: { accentWord: 60, kicker: 40 },
+  metaphor: { label: 80 },
+  stat: { prefix: 4, suffix: 6, valueMin: 0, valueMax: 1_000_000_000 },
+  steps: { title: 80, itemsMax: 3 },
+  comparison: { label: 60, valueMin: 0, valueMax: 100, leftDefault: 30, rightDefault: 90 },
+  quote: { author: 80 },
+  cta: { title: 80, subtitle: 120 },
+} as const;

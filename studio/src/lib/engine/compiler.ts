@@ -5,6 +5,11 @@ import { escapeHtml } from "./escape";
 import { createRng, hashString } from "./rng";
 
 const GSAP_CDN = "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js";
+// Sous-resource integrity (SRI) épinglée sur le bundle GSAP 3.14.2 servi par
+// jsDelivr (URL versionnée = octets immuables). Durcit la chaîne d'appro de
+// l'artefact HTML livré : si le CDN sert un binaire altéré, le navigateur
+// refuse de l'exécuter. Recalcul : `curl -s <GSAP_CDN> | openssl dgst -sha384 -binary | openssl base64 -A`.
+const GSAP_SRI = "sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2";
 
 /**
  * Compile un storyboard en composition HTML autonome, conforme au
@@ -28,7 +33,7 @@ export function compileStoryboard(storyboard: Storyboard, options: CompileOption
   const gsapTag =
     options.gsap?.mode === "inline"
       ? `<script>${options.gsap.source}</script>`
-      : `<script src="${GSAP_CDN}"></script>`;
+      : `<script src="${GSAP_CDN}" integrity="${GSAP_SRI}" crossorigin="anonymous"></script>`;
 
   const fontLink = theme.fontLink
     ? `<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="${escapeHtml(theme.fontLink)}" />`
@@ -107,6 +112,10 @@ function buildPlayerRuntime(durationSec: number): string {
     if (!m || typeof m !== "object") return;
     if (m.type === "cf:seek" && typeof m.t === "number") apply(m.t);
   });
+  // targetOrigin "*" est requis : ce document tourne dans une iframe sandbox
+  // sans allow-same-origin, donc son origine est opaque ("null") et le parent
+  // ne peut pas être ciblé par une origine nommée. Aucun secret ne transite
+  // (seule la durée), et le parent filtre déjà par event.source.
   function boot() { apply(0); if (window.parent !== window) window.parent.postMessage({ type: "cf:ready", duration: DUR }, "*"); }
   if (document.readyState === "complete") boot();
   else window.addEventListener("load", boot);

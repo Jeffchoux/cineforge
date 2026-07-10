@@ -1,5 +1,5 @@
 import type { Scene, Storyboard } from "./types";
-import { BRIEF_LIMITS } from "./types";
+import { BRIEF_LIMITS, SCENE_FIELD_LIMITS } from "./types";
 
 function str(v: string | undefined, max: number): string | undefined {
   return v === undefined ? undefined : v.slice(0, max);
@@ -61,32 +61,33 @@ export function mergeAiScenes(base: Storyboard, ai: AiStoryboardDraft): Storyboa
     cursor += duration;
     switch (s.type) {
       case "hook":
-        return { ...common, type: "hook", title: str(s.title, BRIEF_LIMITS.topicMax) ?? base.title, accentWord: str(s.accentWord, 60), kicker: str(s.kicker, 40) };
+        return { ...common, type: "hook", title: str(s.title, BRIEF_LIMITS.topicMax) ?? base.title, accentWord: str(s.accentWord, SCENE_FIELD_LIMITS.hook.accentWord), kicker: str(s.kicker, SCENE_FIELD_LIMITS.hook.kicker) };
       case "metaphor":
-        return { ...common, type: "metaphor", visual: s.visual ?? "growth", label: str(s.label, 80) ?? "", caption: str(s.caption, BRIEF_LIMITS.pointMax) ?? s.narration };
+        return { ...common, type: "metaphor", visual: s.visual ?? "growth", label: str(s.label, SCENE_FIELD_LIMITS.metaphor.label) ?? "", caption: str(s.caption, BRIEF_LIMITS.pointMax) ?? s.narration };
       case "stat":
         return {
           ...common, type: "stat",
-          value: clampNumber(s.value, 0, 1_000_000_000),
-          prefix: s.prefix?.slice(0, 4), suffix: s.suffix?.slice(0, 6),
+          value: clampNumber(s.value, SCENE_FIELD_LIMITS.stat.valueMin, SCENE_FIELD_LIMITS.stat.valueMax),
+          prefix: s.prefix?.slice(0, SCENE_FIELD_LIMITS.stat.prefix), suffix: s.suffix?.slice(0, SCENE_FIELD_LIMITS.stat.suffix),
           label: str(s.statLabel, BRIEF_LIMITS.pointMax) ?? s.narration,
         };
       case "steps":
         return {
           ...common, type: "steps",
-          title: str(s.title, 80) ?? "",
-          items: (s.items ?? []).filter((it): it is string => typeof it === "string").map((it) => it.slice(0, BRIEF_LIMITS.pointMax)).slice(0, 3),
+          title: str(s.title, SCENE_FIELD_LIMITS.steps.title) ?? "",
+          items: (s.items ?? []).filter((it): it is string => typeof it === "string").map((it) => it.slice(0, BRIEF_LIMITS.pointMax)).slice(0, SCENE_FIELD_LIMITS.steps.itemsMax),
         };
       case "comparison":
         return {
           ...common, type: "comparison", title: str(s.title, BRIEF_LIMITS.topicMax) ?? "",
-          leftLabel: str(s.leftLabel, 60) ?? "A", rightLabel: str(s.rightLabel, 60) ?? "B",
-          leftValue: clampNumber(s.leftValue ?? 30, 0, 100), rightValue: clampNumber(s.rightValue ?? 90, 0, 100),
+          leftLabel: str(s.leftLabel, SCENE_FIELD_LIMITS.comparison.label) ?? "A", rightLabel: str(s.rightLabel, SCENE_FIELD_LIMITS.comparison.label) ?? "B",
+          leftValue: clampNumber(s.leftValue ?? SCENE_FIELD_LIMITS.comparison.leftDefault, SCENE_FIELD_LIMITS.comparison.valueMin, SCENE_FIELD_LIMITS.comparison.valueMax),
+          rightValue: clampNumber(s.rightValue ?? SCENE_FIELD_LIMITS.comparison.rightDefault, SCENE_FIELD_LIMITS.comparison.valueMin, SCENE_FIELD_LIMITS.comparison.valueMax),
         };
       case "quote":
-        return { ...common, type: "quote", text: str(s.text, BRIEF_LIMITS.topicMax) ?? s.narration, author: str(s.author, 80) };
+        return { ...common, type: "quote", text: str(s.text, BRIEF_LIMITS.topicMax) ?? s.narration, author: str(s.author, SCENE_FIELD_LIMITS.quote.author) };
       case "cta":
-        return { ...common, type: "cta", title: str(s.title, 80) ?? "", subtitle: str(s.subtitle, 120) };
+        return { ...common, type: "cta", title: str(s.title, SCENE_FIELD_LIMITS.cta.title) ?? "", subtitle: str(s.subtitle, SCENE_FIELD_LIMITS.cta.subtitle) };
       default:
         return { ...common, type: "quote", text: s.narration };
     }

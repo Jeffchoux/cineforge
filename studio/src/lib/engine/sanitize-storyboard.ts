@@ -1,5 +1,5 @@
 import type { Brief, MetaphorVisual, Scene, Storyboard } from "./types";
-import { ASPECT_DIMENSIONS, BRIEF_LIMITS } from "./types";
+import { ASPECT_DIMENSIONS, BRIEF_LIMITS, SCENE_FIELD_LIMITS } from "./types";
 import { sanitizeBrief } from "./planner";
 import { resolveTheme } from "./themes";
 
@@ -51,54 +51,54 @@ export function sanitizeStoryboard(input: unknown): Storyboard {
         return {
           ...common, type: "hook",
           title: str(s.title, BRIEF_LIMITS.topicMax, brief.topic),
-          accentWord: s.accentWord === undefined ? undefined : str(s.accentWord, 60),
-          kicker: s.kicker === undefined ? undefined : str(s.kicker, 40),
+          accentWord: s.accentWord === undefined ? undefined : str(s.accentWord, SCENE_FIELD_LIMITS.hook.accentWord),
+          kicker: s.kicker === undefined ? undefined : str(s.kicker, SCENE_FIELD_LIMITS.hook.kicker),
         };
       case "metaphor": {
         const visual = METAPHOR_VISUALS.has(s.visual as MetaphorVisual) ? (s.visual as MetaphorVisual) : "growth";
         return {
           ...common, type: "metaphor", visual,
-          label: str(s.label, 80),
+          label: str(s.label, SCENE_FIELD_LIMITS.metaphor.label),
           caption: str(s.caption, BRIEF_LIMITS.pointMax),
         };
       }
       case "stat":
         return {
           ...common, type: "stat",
-          value: num(s.value, 0, 1_000_000_000, 0),
-          prefix: s.prefix === undefined ? undefined : str(s.prefix, 4),
-          suffix: s.suffix === undefined ? undefined : str(s.suffix, 6),
+          value: num(s.value, SCENE_FIELD_LIMITS.stat.valueMin, SCENE_FIELD_LIMITS.stat.valueMax, 0),
+          prefix: s.prefix === undefined ? undefined : str(s.prefix, SCENE_FIELD_LIMITS.stat.prefix),
+          suffix: s.suffix === undefined ? undefined : str(s.suffix, SCENE_FIELD_LIMITS.stat.suffix),
           label: str(s.label, BRIEF_LIMITS.pointMax),
         };
       case "steps":
         return {
           ...common, type: "steps",
-          title: str(s.title, 80),
+          title: str(s.title, SCENE_FIELD_LIMITS.steps.title),
           items: (Array.isArray(s.items) ? s.items : [])
             .filter((it): it is string => typeof it === "string")
             .map((it) => it.slice(0, BRIEF_LIMITS.pointMax))
-            .slice(0, 3),
+            .slice(0, SCENE_FIELD_LIMITS.steps.itemsMax),
         };
       case "comparison":
         return {
           ...common, type: "comparison",
           title: str(s.title, BRIEF_LIMITS.topicMax),
-          leftLabel: str(s.leftLabel, 60, "A"),
-          rightLabel: str(s.rightLabel, 60, "B"),
-          leftValue: num(s.leftValue, 0, 100, 30),
-          rightValue: num(s.rightValue, 0, 100, 90),
+          leftLabel: str(s.leftLabel, SCENE_FIELD_LIMITS.comparison.label, "A"),
+          rightLabel: str(s.rightLabel, SCENE_FIELD_LIMITS.comparison.label, "B"),
+          leftValue: num(s.leftValue, SCENE_FIELD_LIMITS.comparison.valueMin, SCENE_FIELD_LIMITS.comparison.valueMax, SCENE_FIELD_LIMITS.comparison.leftDefault),
+          rightValue: num(s.rightValue, SCENE_FIELD_LIMITS.comparison.valueMin, SCENE_FIELD_LIMITS.comparison.valueMax, SCENE_FIELD_LIMITS.comparison.rightDefault),
         };
       case "quote":
         return {
           ...common, type: "quote",
           text: str(s.text, BRIEF_LIMITS.topicMax),
-          author: s.author === undefined ? undefined : str(s.author, 80),
+          author: s.author === undefined ? undefined : str(s.author, SCENE_FIELD_LIMITS.quote.author),
         };
       case "cta":
         return {
           ...common, type: "cta",
-          title: str(s.title, 80, "À vous de jouer."),
-          subtitle: s.subtitle === undefined ? undefined : str(s.subtitle, 120),
+          title: str(s.title, SCENE_FIELD_LIMITS.cta.title, "À vous de jouer."),
+          subtitle: s.subtitle === undefined ? undefined : str(s.subtitle, SCENE_FIELD_LIMITS.cta.subtitle),
         };
       default:
         throw new Error(`Storyboard invalide : type de scène inconnu « ${String(s.type)} » (scène ${i + 1}).`);
