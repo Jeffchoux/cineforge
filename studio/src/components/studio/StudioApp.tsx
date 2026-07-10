@@ -30,6 +30,9 @@ export function StudioApp() {
   const [captions, setCaptions] = useState(false);
   const [aiStatus, setAiStatus] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  // GSAP servi depuis l'origine de l'app (public/vendor) puis inliné dans la
+  // preview : offline-first, zéro dépendance CDN, aucune requête externe.
+  const [gsapSource, setGsapSource] = useState<string | null>(null);
 
   const buildBrief = useCallback(
     (seed?: number): Brief => ({
@@ -104,12 +107,32 @@ export function StudioApp() {
     void generate(Math.floor(Math.random() * 2 ** 31));
   }, [generate]);
 
-  // Recompile la preview avec un debounce à chaque édition du storyboard.
+  // Charge GSAP une fois depuis l'origine de l'app (jamais depuis un CDN).
   useEffect(() => {
-    if (!storyboard) return;
-    const timer = window.setTimeout(() => setHtml(compileStoryboard(storyboard, { captions })), 300);
+    let cancelled = false;
+    fetch("/vendor/gsap.min.js")
+      .then((res) => (res.ok ? res.text() : Promise.reject(new Error(String(res.status)))))
+      .then((src) => {
+        if (!cancelled) setGsapSource(src);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Moteur d'animation introuvable — rechargez la page.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Recompile la preview avec un debounce à chaque édition du storyboard.
+  // GSAP est inliné : le document de preview est autonome et hors-ligne.
+  useEffect(() => {
+    if (!storyboard || !gsapSource) return;
+    const timer = window.setTimeout(
+      () => setHtml(compileStoryboard(storyboard, { captions, gsap: { mode: "inline", source: gsapSource } })),
+      300,
+    );
     return () => window.clearTimeout(timer);
-  }, [storyboard, captions]);
+  }, [storyboard, captions, gsapSource]);
 
   // Raccourci ⌘/Ctrl + Entrée → générer.
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Brief, Storyboard } from "@/lib/engine";
-import { planStoryboard, sanitizeBrief } from "@/lib/engine";
+import { planStoryboard, sanitizeBrief, sanitizeStoryboard } from "@/lib/engine";
 import { mergeAiScenes, type AiStoryboardDraft } from "@/lib/engine/ai";
 
 export const runtime = "nodejs";
@@ -150,7 +150,9 @@ export async function POST(request: NextRequest) {
     }
 
     const parsed = JSON.parse(textBlock.text) as AiStoryboardDraft;
-    const storyboard = mergeAiScenes(base, parsed);
+    // Frontière de confiance unifiée : la sortie IA repasse par la même
+    // validation stricte que les imports JSON manuels (défense en profondeur).
+    const storyboard = sanitizeStoryboard(mergeAiScenes(base, parsed));
     return NextResponse.json({ storyboard });
   } catch (error) {
     console.error("Génération IA échouée:", error instanceof Error ? error.message : error);

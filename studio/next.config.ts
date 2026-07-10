@@ -3,12 +3,13 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV === "development";
 
 // CSP : les compositions de preview vivent dans une iframe srcDoc (qui hérite
-// de cette politique) — GSAP vient de jsDelivr, les polices de Google Fonts,
-// et leurs timelines sont des scripts inline. `unsafe-eval` uniquement en dev
-// (HMR de Next).
+// de cette politique) — GSAP est inliné localement (public/vendor), les polices
+// viennent de Google Fonts, et les timelines sont des scripts inline. Aucun CDN
+// tiers : la surface supply-chain est réduite à l'origine de l'app.
+// `unsafe-eval` uniquement en dev (HMR de Next).
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net${isDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",

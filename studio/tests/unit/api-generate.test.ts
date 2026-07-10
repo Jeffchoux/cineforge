@@ -97,6 +97,46 @@ describe("/api/generate", () => {
     expect(total).toBeCloseTo(15, 0);
   });
 
+  it("appelle le SDK avec la forme structured-output attendue (contrat)", async () => {
+    createMock.mockResolvedValue({
+      stop_reason: "end_turn",
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            title: "T",
+            scenes: [
+              { type: "hook", durationSec: 3, narration: "A" },
+              { type: "cta", durationSec: 2, narration: "B" },
+            ],
+          }),
+        },
+      ],
+    });
+    const res = await POST(makeRequest({ brief: VALID_BRIEF }));
+    expect(res.status).toBe(200);
+    expect(createMock).toHaveBeenCalledTimes(1);
+    const args = createMock.mock.calls[0][0];
+    // La requête doit demander un JSON schema via output_config.format —
+    // c'est ce qui garantit que response.content[0] est un bloc texte JSON.
+    expect(args.model).toBe("claude-opus-4-8");
+    expect(args.output_config?.format?.type).toBe("json_schema");
+    expect(args.output_config?.format?.schema).toBeTypeOf("object");
+    expect(args.output_config?.format?.schema?.required).toContain("scenes");
+  });
+
+  it("502 si le bloc texte attendu est absent de la réponse SDK", async () => {
+    // Contrat de parsing : sans bloc texte JSON, on ne renvoie pas un
+    // storyboard malformé — on signale une réponse vide.
+    createMock.mockResolvedValue({
+      stop_reason: "end_turn",
+      content: [{ type: "tool_use", id: "x", name: "y", input: {} }],
+    });
+    const res = await POST(makeRequest({ brief: VALID_BRIEF }));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toBe("AI_EMPTY");
+  });
+
   it("502 sur refus du modèle", async () => {
     createMock.mockResolvedValue({ stop_reason: "refusal", content: [] });
     const res = await POST(makeRequest({ brief: VALID_BRIEF }));
