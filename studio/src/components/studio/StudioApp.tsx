@@ -24,7 +24,11 @@ const DEFAULT_FORM: BriefFormState = {
 export function StudioApp() {
   const [form, setForm] = useState<BriefFormState>(DEFAULT_FORM);
   const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
-  const [html, setHtml] = useState("");
+  // Deux compilations : la preview (en ligne) charge les polices web pour un
+  // rendu exact ; l'export téléchargé est offline-first (polices système, GSAP
+  // inliné) → zéro requête réseau, zéro surface CDN au runtime.
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [exportHtml, setExportHtml] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [captions, setCaptions] = useState(false);
@@ -127,10 +131,13 @@ export function StudioApp() {
   // GSAP est inliné : le document de preview est autonome et hors-ligne.
   useEffect(() => {
     if (!storyboard || !gsapSource) return;
-    const timer = window.setTimeout(
-      () => setHtml(compileStoryboard(storyboard, { captions, gsap: { mode: "inline", source: gsapSource } })),
-      300,
-    );
+    const timer = window.setTimeout(() => {
+      const inlineGsap = { gsap: { mode: "inline", source: gsapSource } } as const;
+      // Preview en ligne : polices web pour le rendu exact du thème.
+      setPreviewHtml(compileStoryboard(storyboard, { ...inlineGsap, captions, remoteFonts: true }));
+      // Artefact exporté : offline-first (remoteFonts défaut = false).
+      setExportHtml(compileStoryboard(storyboard, { ...inlineGsap, captions }));
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [storyboard, captions, gsapSource]);
 
@@ -198,7 +205,7 @@ export function StudioApp() {
         </section>
 
         <div className="flex min-w-0 flex-col gap-6">
-          {storyboard && html ? (
+          {storyboard && previewHtml ? (
             <>
               <section aria-label="Prévisualisation" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
@@ -214,7 +221,7 @@ export function StudioApp() {
                   </label>
                 </div>
                 <PreviewPlayer
-                  html={html}
+                  html={previewHtml}
                   width={storyboard.width}
                   height={storyboard.height}
                   duration={storyboard.durationSec}
@@ -243,7 +250,7 @@ export function StudioApp() {
 
               <section aria-label="Exporter" className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <h2 className="mb-4 text-base font-semibold text-white">4 · Exportez</h2>
-                <ExportPanel storyboard={storyboard} html={html} />
+                <ExportPanel storyboard={storyboard} html={exportHtml} />
               </section>
             </>
           ) : (

@@ -218,9 +218,24 @@ describe("compilation", () => {
     expect(html).not.toContain("integrity=");
   });
 
+  it("est offline-first par défaut : aucune police web distante n'est chargée", () => {
+    // Thème midnight = a un fontLink Google Fonts. Par défaut il ne doit PAS
+    // apparaître dans l'artefact (zéro requête réseau au runtime).
+    const html = compileStoryboard(planStoryboard({ ...baseBrief, vibe: "cinematic" }));
+    expect(html).not.toContain("fonts.googleapis.com");
+    expect(html).not.toContain("fonts.gstatic.com");
+  });
+
+  it("charge les polices web uniquement sur opt-in remoteFonts", () => {
+    const html = compileStoryboard(planStoryboard({ ...baseBrief, vibe: "cinematic" }), {
+      remoteFonts: true,
+    });
+    expect(html).toContain("fonts.googleapis.com");
+  });
+
   it("épingle le GSAP CDN avec une intégrité SRI (chaîne d'appro durcie)", () => {
     const html = compileStoryboard(planStoryboard(baseBrief));
-    expect(html).toContain("cdn.jsdelivr.net/npm/gsap@3.14.2");
+    expect(html).toContain("cdn.jsdelivr.net/npm/gsap@3.15.0");
     expect(html).toMatch(/integrity="sha384-[A-Za-z0-9+/]+"/);
     expect(html).toContain('crossorigin="anonymous"');
   });

@@ -4,12 +4,19 @@ import { SCENE_CSS, renderScene } from "./scenes";
 import { escapeHtml } from "./escape";
 import { createRng, hashString } from "./rng";
 
-const GSAP_CDN = "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js";
-// Sous-resource integrity (SRI) épinglée sur le bundle GSAP 3.14.2 servi par
-// jsDelivr (URL versionnée = octets immuables). Durcit la chaîne d'appro de
-// l'artefact HTML livré : si le CDN sert un binaire altéré, le navigateur
-// refuse de l'exécuter. Recalcul : `curl -s <GSAP_CDN> | openssl dgst -sha384 -binary | openssl base64 -A`.
-const GSAP_SRI = "sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2";
+// Source de vérité UNIQUE de la version GSAP servie par l'artefact.
+// DOIT rester alignée sur `gsap` dans package.json ET sur la copie vendored
+// `public/vendor/gsap.min.js`. Le test `tests/unit/gsap-integrity.test.ts`
+// verrouille cet alignement (version + hash SRI) : un bump qui oublie de
+// recalculer le SRI casse la CI au lieu de dériver silencieusement.
+export const GSAP_VERSION = "3.15.0";
+export const GSAP_CDN = `https://cdn.jsdelivr.net/npm/gsap@${GSAP_VERSION}/dist/gsap.min.js`;
+// Sous-resource integrity (SRI) épinglée sur le bundle GSAP servi par jsDelivr
+// (URL versionnée = octets immuables). Durcit la chaîne d'appro de l'artefact
+// HTML livré : si le CDN sert un binaire altéré, le navigateur refuse de
+// l'exécuter. Recalcul : `npm run gsap:sri` (ou
+// `curl -s <GSAP_CDN> | openssl dgst -sha384 -binary | openssl base64 -A`).
+export const GSAP_SRI = "sha384-XmJ9SoHtVOHoQUcKvFAzVXwdkKo1Ie3bhmSoIAkcdsHGaIrVJIkmozyq0FJeb/Ly";
 
 /**
  * Compile un storyboard en composition HTML autonome, conforme au
@@ -35,9 +42,16 @@ export function compileStoryboard(storyboard: Storyboard, options: CompileOption
       ? `<script>${options.gsap.source}</script>`
       : `<script src="${GSAP_CDN}" integrity="${GSAP_SRI}" crossorigin="anonymous"></script>`;
 
-  const fontLink = theme.fontLink
-    ? `<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="${escapeHtml(theme.fontLink)}" />`
-    : "";
+  // Offline-first par défaut : l'artefact livré ne charge AUCUNE ressource
+  // distante (ni CDN GSAP quand il est inliné, ni Google Fonts). On retombe
+  // sur les stacks système déclarées dans chaque thème (-apple-system, Segoe
+  // UI, sans-serif…). Le lien Google Fonts n'est émis que sur opt-in explicite
+  // (`remoteFonts: true`, utilisé par la preview du Studio qui, elle, est en
+  // ligne) — ce qui supprime la surface CDN de tout HTML exporté/téléchargé.
+  const fontLink =
+    options.remoteFonts && theme.fontLink
+      ? `<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="stylesheet" href="${escapeHtml(theme.fontLink)}" />`
+      : "";
 
   const playerRuntime = options.playerRuntime === false ? "" : buildPlayerRuntime(durationSec);
 

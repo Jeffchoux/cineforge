@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Brief, Storyboard } from "@/lib/engine";
 import { planStoryboard, sanitizeBrief, sanitizeStoryboard } from "@/lib/engine";
 import { mergeAiScenes, type AiStoryboardDraft } from "@/lib/engine/ai";
+import { isRateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -68,21 +69,6 @@ const SCENE_SCHEMA = {
 };
 
 const MAX_BODY_BYTES = 50_000;
-const RATE_LIMIT = { windowMs: 60_000, max: 10 };
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
-
-/** Rate limiting best-effort par IP (mémoire locale de l'instance). */
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const bucket = rateBuckets.get(ip);
-  if (!bucket || now > bucket.resetAt) {
-    rateBuckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT.windowMs });
-    if (rateBuckets.size > 10_000) rateBuckets.clear();
-    return false;
-  }
-  bucket.count += 1;
-  return bucket.count > RATE_LIMIT.max;
-}
 
 export async function POST(request: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
@@ -97,7 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "PAYLOAD_TOO_LARGE" }, { status: 413 });
   }
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (isRateLimited(ip)) {
+  if (await isRateLimited(ip)) {
     return NextResponse.json({ error: "RATE_LIMITED" }, { status: 429 });
   }
 

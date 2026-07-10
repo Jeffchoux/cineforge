@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "coverage/**",
     "next-env.d.ts",
     // Third-party vendored bundles (e.g. gsap.min.js) are not our source to lint.
     "public/vendor/**",

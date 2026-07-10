@@ -147,6 +147,13 @@ export interface CompileOptions {
   playerRuntime?: boolean;
   /** Afficher la narration en sous-titres (piste dédiée) */
   captions?: boolean;
+  /**
+   * Charger les polices web distantes (Google Fonts). `false` par défaut :
+   * l'artefact reste offline-first (zéro requête réseau, zéro surface CDN) et
+   * s'appuie sur les stacks de polices système du thème. Passer `true` pour la
+   * preview en ligne du Studio qui veut le rendu exact des polices web.
+   */
+  remoteFonts?: boolean;
 }
 
 export const ASPECT_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {

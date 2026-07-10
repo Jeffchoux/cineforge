@@ -16,6 +16,7 @@ vi.mock("@anthropic-ai/sdk", () => ({
 
 // Import APRÈS le mock.
 const { POST } = await import("../../src/app/api/generate/route");
+const { compileStoryboard } = await import("../../src/lib/engine");
 
 const VALID_BRIEF = {
   topic: "Les tests du mode IA",
@@ -95,6 +96,57 @@ describe("/api/generate", () => {
       0,
     );
     expect(total).toBeCloseTo(15, 0);
+  });
+
+  it("neutralise une sortie IA hostile (script/onerror dans title & narration)", async () => {
+    // Frontière de confiance côté IA : même si le modèle (ou une réponse
+    // détournée) renvoie des balises, mergeAiScenes + sanitizeStoryboard puis
+    // la compilation ne doivent produire AUCUNE balise réelle exécutable.
+    createMock.mockResolvedValue({
+      stop_reason: "end_turn",
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            title: "<script>alert('title')</script>",
+            scenes: [
+              {
+                type: "hook",
+                durationSec: 3,
+                narration: "<img src=x onerror=alert('narr')>",
+                title: "<script>steal()</script>",
+                kicker: "\"><svg onload=alert(1)>",
+              },
+              {
+                type: "quote",
+                durationSec: 3,
+                narration: "citation",
+                text: "</title><script>evil()</script>",
+                author: "<b>anon</b>",
+              },
+            ],
+          }),
+        },
+      ],
+    });
+    const res = await POST(makeRequest({ brief: VALID_BRIEF }));
+    expect(res.status).toBe(200);
+    const { storyboard } = await res.json();
+
+    // La frontière de confiance est la COMPILATION : le texte hostile est stocké
+    // tel quel dans le modèle (données), mais `escapeHtml` neutralise chaque
+    // chevron au rendu. La compilation (sous-titres inclus) ne doit émettre
+    // aucune balise réelle injectée.
+    const html = compileStoryboard(storyboard, { captions: true });
+    expect(html).not.toContain("<script>alert");
+    expect(html).not.toContain("<script>steal");
+    expect(html).not.toContain("<script>evil");
+    // Les vecteurs à balise sont neutralisés (chevrons échappés → inertes).
+    // `onerror=`/`onload=` peut subsister comme texte échappé, sans balise porteuse.
+    expect(html).not.toContain("<svg onload=");
+    expect(html).not.toContain("<img src=x");
+    // Le contenu hostile survit sous forme échappée (donc bien rendu, inerte).
+    expect(html).toContain("&lt;script&gt;");
   });
 
   it("appelle le SDK avec la forme structured-output attendue (contrat)", async () => {

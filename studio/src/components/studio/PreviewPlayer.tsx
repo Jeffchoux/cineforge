@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scene } from "@/lib/engine";
 import { Timeline } from "./Timeline";
-import { formatTime } from "./helpers";
+import { activeSceneIndex, clampTime, computeStageScale, formatTime, sceneNavTarget } from "./helpers";
 
 interface PreviewPlayerProps {
   html: string;
@@ -37,7 +37,7 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
 
   const seek = useCallback(
     (t: number) => {
-      const clamped = Math.max(0, Math.min(t, duration));
+      const clamped = clampTime(t, duration);
       timeRef.current = clamped;
       setTime(clamped);
       postSeek(clamped);
@@ -110,11 +110,11 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
     return () => observer.disconnect();
   }, []);
 
-  const scale = containerWidth > 0 ? Math.min(containerWidth / width, MAX_STAGE_HEIGHT / height) : 0;
+  const scale = computeStageScale(containerWidth, width, height, MAX_STAGE_HEIGHT);
   const stageW = width * scale;
   const stageH = height * scale;
 
-  const currentSceneIndex = scenes.findIndex((s) => time >= s.start && time < s.start + s.duration);
+  const currentSceneIndex = activeSceneIndex(scenes, time);
 
   const togglePlay = () => {
     if (playing) {
@@ -126,9 +126,8 @@ export function PreviewPlayer({ html, width, height, duration, scenes }: Preview
   };
 
   const goToScene = (offset: number) => {
-    const index = currentSceneIndex === -1 ? scenes.length - 1 : currentSceneIndex;
-    const target = scenes[Math.max(0, Math.min(scenes.length - 1, index + offset))];
-    if (target) seek(target.start + 0.01);
+    const target = sceneNavTarget(scenes, currentSceneIndex, offset);
+    if (target !== null) seek(target);
   };
 
   return (

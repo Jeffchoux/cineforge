@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Storyboard } from "@/lib/engine";
-import { downloadBlob, slugify } from "./helpers";
+import { downloadBlob, renderCommandFor, slugify } from "./helpers";
 
 interface ExportPanelProps {
   storyboard: Storyboard;
@@ -15,7 +15,7 @@ export function ExportPanel({ storyboard, html }: ExportPanelProps) {
 
   const slug = slugify(storyboard.title);
   const json = JSON.stringify(storyboard, null, 2);
-  const renderCommand = `npm run render -- --storyboard ${slug}.json`;
+  const renderCommand = renderCommandFor(slug);
 
   const copy = async (text: string, tag: "json" | "cmd") => {
     try {
