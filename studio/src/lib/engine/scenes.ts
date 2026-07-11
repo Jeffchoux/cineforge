@@ -23,8 +23,23 @@ export const SCENE_CSS = `
 .backdrop-pattern { position: absolute; inset: 0; }
 
 .clip { position: absolute; inset: 0; display: grid; place-items: center; visibility: hidden; z-index: 1; }
-.scene-inner { display: grid; place-items: center; gap: calc(var(--u) * 3); padding: calc(var(--u) * 8); text-align: center; width: 92%; }
+.scene-inner { position: relative; z-index: 2; display: grid; place-items: center; gap: calc(var(--u) * 3); padding: calc(var(--u) * 8); text-align: center; width: 92%; }
 .scene-inner > * { overflow-wrap: break-word; min-width: 0; max-width: 100%; }
+
+/* Fond vidéo réel (stock footage) — sous le contenu, overlay pour la lisibilité. */
+.scene-video-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+.scene-video-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.62) 70%, rgba(0,0,0,0.82) 100%);
+}
+.scene-video-credit {
+  position: absolute; right: calc(var(--u) * 1.6); bottom: calc(var(--u) * 1.2); z-index: 2;
+  font-family: var(--font-body); font-size: calc(var(--u) * 1.2); color: rgba(255,255,255,0.5);
+}
+.has-video-bg .hook-title, .has-video-bg .metaphor-label, .has-video-bg .steps-title,
+.has-video-bg .quote-text, .has-video-bg .cta-title { color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,0.55); }
+.has-video-bg .metaphor-caption, .has-video-bg .cta-subtitle, .has-video-bg .step-text { color: rgba(255,255,255,0.88); }
+.has-video-bg .step-card { background: rgba(10,12,24,0.55); border-color: rgba(255,255,255,0.18); }
 
 .kicker {
   font-family: var(--font-body); font-size: calc(var(--u) * 2.6); font-weight: 600;
@@ -186,10 +201,27 @@ function formatStatValue(value: number): string {
   return (Number.isInteger(value) ? value.toString() : value.toFixed(1)).replace(".", ",");
 }
 
+/**
+ * Calque de fond vidéo réel (stock footage), sous le contenu, avec un dégradé
+ * assombrissant pour garantir la lisibilité du texte par-dessus (constaté
+ * nécessaire sur le prototype : sans overlay, le texte devient illisible sur
+ * une vidéo claire).
+ */
+function videoBackgroundHtml(scene: Scene): string {
+  const bg = scene.videoBackground;
+  if (!bg) return "";
+  const credit = bg.credit ? ` — vidéo : ${escapeHtml(bg.credit)} (Pexels)` : "";
+  return `<video class="scene-video-bg" src="${escapeHtml(bg.url)}" autoplay muted loop playsinline aria-hidden="true"></video>
+<div class="scene-video-overlay" aria-hidden="true"></div>
+<div class="scene-video-credit"${credit ? "" : ' style="display:none"'}>${credit}</div>`;
+}
+
 /** Enveloppe standard d'un clip HyperFrames (classe par type pour les layouts). */
 function clip(scene: Scene, inner: string): string {
-  return `<div id="${escapeHtml(scene.id)}" class="clip" data-start="${scene.start}" data-duration="${scene.duration}" data-track-index="1">
-  <div class="scene-inner scene-${scene.type}">${inner}</div>
+  const videoBg = videoBackgroundHtml(scene);
+  const hasVideoBg = Boolean(scene.videoBackground);
+  return `<div id="${escapeHtml(scene.id)}" class="clip${hasVideoBg ? " has-video-bg" : ""}" data-start="${scene.start}" data-duration="${scene.duration}" data-track-index="1">
+  ${videoBg}<div class="scene-inner scene-${scene.type}">${inner}</div>
 </div>`;
 }
 

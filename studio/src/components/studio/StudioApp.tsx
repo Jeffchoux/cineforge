@@ -56,6 +56,43 @@ export function StudioApp() {
     [form],
   );
 
+  /**
+   * Enrichissement en fond des scènes avec un vrai fond vidéo (stock footage) —
+   * appel séparé de /api/generate : le storyboard texte reste instantané
+   * (offline-first), la vidéo arrive ensuite. Jamais bloquant : sans clé
+   * Pexels côté serveur (501) ou en cas d'erreur, le storyboard garde
+   * simplement son fond thème actuel.
+   */
+  const enrichVisuals = useCallback(async (base: Storyboard) => {
+    try {
+      const res = await fetch("/api/enrich-visuals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ storyboard: base }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { storyboard?: Storyboard };
+      if (!data.storyboard?.scenes?.length) return;
+      const enriched = sanitizeStoryboard(data.storyboard);
+      const videoBackgrounds = new Map(enriched.scenes.map((s) => [s.id, s.videoBackground]));
+      // Fusionne uniquement les fonds vidéo sur le storyboard courant (par id
+      // de scène) plutôt que de remplacer tout l'état : si l'utilisateur a
+      // édité une scène ou regénéré pendant l'appel réseau, ce travail n'est
+      // jamais écrasé par la réponse d'enrichissement.
+      setStoryboard((current) => {
+        if (!current || current.id !== base.id) return current;
+        return {
+          ...current,
+          scenes: current.scenes.map((s) =>
+            videoBackgrounds.has(s.id) ? ({ ...s, videoBackground: videoBackgrounds.get(s.id) } as Scene) : s,
+          ),
+        };
+      });
+    } catch {
+      // Silencieux : le fond thème existant reste utilisé.
+    }
+  }, []);
+
   const generate = useCallback(
     async (seed?: number) => {
       let next: Storyboard;
@@ -103,8 +140,9 @@ export function StudioApp() {
 
       setStoryboard(next);
       setActiveSceneId(null);
+      void enrichVisuals(next);
     },
-    [buildBrief, form.useAi],
+    [buildBrief, form.useAi, enrichVisuals],
   );
 
   const variation = useCallback(() => {

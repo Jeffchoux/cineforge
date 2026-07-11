@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>CineForge — Prototype fond vidéo réelle</title>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+  :root {
+    --u: 10.8px;
+    --ink: #f4f6ff;
+    --muted: #b7bfe0;
+    --accent: #7c9cff;
+    --accent2: #6fe3d0;
+    --card-bg: rgba(20, 24, 46, 0.55);
+    --card-border: rgba(124, 156, 255, 0.28);
+    --font-head: "Segoe UI", -apple-system, sans-serif;
+    --font-body: "Segoe UI", -apple-system, sans-serif;
+  }
+  body { font-family: var(--font-body); }
+  #root { position: relative; width: 1920px; height: 1080px; background: #0a0d1c; }
+
+  .clip { position: absolute; inset: 0; display: grid; place-items: center; visibility: hidden; z-index: 1; }
+  .scene-inner { position: relative; display: grid; place-items: center; gap: calc(var(--u) * 3); padding: calc(var(--u) * 8); text-align: center; width: 100%; height: 100%; z-index: 2; }
+
+  /* --- Fond vidéo réelle (nouveau) --- */
+  .scene-video-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 0;
+  }
+  .scene-video-overlay {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(180deg, rgba(10,13,28,0.35) 0%, rgba(10,13,28,0.72) 68%, rgba(10,13,28,0.92) 100%);
+  }
+  .video-credit {
+    position: absolute; right: calc(var(--u) * 2); bottom: calc(var(--u) * 1.4);
+    font-size: calc(var(--u) * 1.4); color: rgba(255,255,255,0.45); z-index: 3;
+    font-family: var(--font-body);
+  }
+
+  .kicker {
+    font-size: calc(var(--u) * 2.6); font-weight: 600;
+    letter-spacing: 0.35em; color: var(--accent2); text-transform: uppercase;
+  }
+  .hook-title {
+    font-family: var(--font-head); font-size: calc(var(--u) * 8.4); font-weight: 800;
+    color: #fff; line-height: 1.14; letter-spacing: -0.02em; max-width: 74%;
+    text-shadow: 0 calc(var(--u)*0.3) calc(var(--u)*2) rgba(0,0,0,0.55);
+  }
+  .hook-title .accent { color: var(--accent2); }
+
+  .metaphor-label { font-size: calc(var(--u) * 5); font-weight: 800; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.5); }
+  .metaphor-caption { font-size: calc(var(--u) * 3); color: var(--muted); max-width: 60%; }
+
+  .badge {
+    position: absolute; top: calc(var(--u) * 3); left: calc(var(--u) * 3); z-index: 3;
+    display: flex; align-items: center; gap: calc(var(--u) * 1);
+    background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 999px;
+    padding: calc(var(--u) * 0.9) calc(var(--u) * 2); font-size: calc(var(--u) * 1.5); color: var(--ink);
+    backdrop-filter: blur(6px);
+  }
+  .badge b { color: var(--accent2); }
+
+  .label-tag {
+    position: absolute; top: 0; left: 0; background: #101425; color: #fff;
+    font-size: 13px; padding: 4px 10px; z-index: 10; font-family: sans-serif;
+  }
+</style>
+</head>
+<body>
+<div id="root">
+
+  <!-- Scène 1 : Hook avec fond vidéo réel -->
+  <div id="scene-1" class="clip" data-start="0" data-duration="4" data-track-index="1" style="visibility:visible">
+    <video class="scene-video-bg" src="https://videos.pexels.com/video-files/5983686/5983686-uhd_2560_1440_25fps.mp4" autoplay muted loop playsinline></video>
+    <div class="scene-video-overlay"></div>
+    <div class="badge">🎬 <b>Avant</b> — motion design pur (aujourd'hui)</div>
+    <div class="scene-inner">
+      <div class="kicker">Décryptage</div>
+      <h1 class="hook-title">Le sommeil est votre <span class="accent">super-pouvoir</span></h1>
+    </div>
+    <div class="video-credit">Vidéo : Pexels — gratuit, usage commercial libre · muet, sans parole ni musique</div>
+  </div>
+
+  <!-- Scène 2 : Métaphore avec fond vidéo réel -->
+  <div id="scene-2" class="clip" data-start="4" data-duration="4" data-track-index="1">
+    <video class="scene-video-bg" src="https://videos.pexels.com/video-files/5331563/5331563-uhd_2732_1440_30fps.mp4" autoplay muted loop playsinline></video>
+    <div class="scene-video-overlay"></div>
+    <div class="badge">✨ <b>Après</b> — fond vidéo réelle (16:9) + texte animé</div>
+    <div class="scene-inner">
+      <div class="metaphor-label">3x plus de récupération</div>
+      <div class="metaphor-caption">Un sommeil profond régénère le corps bien plus vite qu'on ne le pense.</div>
+    </div>
+    <div class="video-credit">Vidéo : Pexels — gratuit, usage commercial libre · muet, sans parole ni musique</div>
+  </div>
+
+</div>
+
+<script>
+  window.__timelines = window.__timelines || {};
+  var tl = gsap.timeline({ repeat: -1 });
+
+  // Scène 1
+  tl.set("#scene-1", { visibility: "visible" }, 0);
+  tl.fromTo("#scene-1 .scene-inner", { opacity: 0, y: 46 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0);
+  tl.to("#scene-1 .scene-inner", { opacity: 0, scale: 0.94, duration: 0.45, ease: "power2.in" }, 3.5);
+  tl.set("#scene-1", { visibility: "hidden" }, 4);
+
+  // Scène 2
+  tl.set("#scene-2", { visibility: "visible" }, 4);
+  tl.fromTo("#scene-2 .scene-inner", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 4);
+  tl.to("#scene-2 .scene-inner", { opacity: 0, filter: "blur(8px)", duration: 0.45, ease: "power2.in" }, 7.5);
+  tl.set("#scene-2", { visibility: "hidden" }, 8);
+
+  window.__timelines["main"] = tl;
+</script>
+</body>
+</html>

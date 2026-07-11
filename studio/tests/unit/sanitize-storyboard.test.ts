@@ -43,6 +43,44 @@ describe("sanitizeStoryboard (frontière JSON non fiable)", () => {
     expect(() => sanitizeStoryboard("string")).toThrow();
   });
 
+  it("accepte un videoBackground pexels https légitime", () => {
+    const hostile = JSON.parse(JSON.stringify(planStoryboard(brief)));
+    hostile.scenes[0].videoBackground = {
+      id: "123", provider: "pexels", credit: "Jane Doe",
+      url: "https://videos.pexels.com/video-files/123/123-hd.mp4",
+    };
+    const clean = sanitizeStoryboard(hostile);
+    expect(clean.scenes[0].videoBackground).toEqual({
+      id: "123", provider: "pexels", credit: "Jane Doe",
+      url: "https://videos.pexels.com/video-files/123/123-hd.mp4",
+    });
+  });
+
+  it("rejette un videoBackground avec un hôte non whitelisté (anti-injection)", () => {
+    const hostile = JSON.parse(JSON.stringify(planStoryboard(brief)));
+    hostile.scenes[0].videoBackground = {
+      id: "1", provider: "pexels", url: "https://evil.tld/payload.mp4",
+    };
+    const clean = sanitizeStoryboard(hostile);
+    expect(clean.scenes[0].videoBackground).toBeUndefined();
+  });
+
+  it("rejette un videoBackground non-https (javascript:, data:)", () => {
+    const hostile = JSON.parse(JSON.stringify(planStoryboard(brief)));
+    hostile.scenes[0].videoBackground = {
+      id: "1", provider: "pexels", url: "javascript:alert(1)",
+    };
+    expect(sanitizeStoryboard(hostile).scenes[0].videoBackground).toBeUndefined();
+  });
+
+  it("rejette un provider inconnu", () => {
+    const hostile = JSON.parse(JSON.stringify(planStoryboard(brief)));
+    hostile.scenes[0].videoBackground = {
+      id: "1", provider: "evil-cdn", url: "https://videos.pexels.com/video-files/1/1.mp4",
+    };
+    expect(sanitizeStoryboard(hostile).scenes[0].videoBackground).toBeUndefined();
+  });
+
   it("régénère les ids et whiteliste le visual des métaphores", () => {
     const hostile = JSON.parse(JSON.stringify(planStoryboard({ ...brief, durationSec: 30 })));
     for (const s of hostile.scenes) s.id = '"><img onerror=alert(1)>';

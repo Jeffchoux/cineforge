@@ -39,6 +39,22 @@ export interface Theme {
 
 export type MetaphorVisual = "battery" | "orbit" | "growth" | "pulse" | "network";
 
+/**
+ * Clip de fond réel (stock footage) attaché à une scène — résolu une fois par
+ * le planner/sélecteur et mémorisé dans le storyboard, jamais re-résolu à la
+ * compilation (déterminisme : même storyboard = même clip à chaque render).
+ */
+export interface VideoBackground {
+  /** Identifiant du clip chez le fournisseur (pour cache/traçabilité) */
+  id: string;
+  /** URL directe du fichier vidéo (mp4) */
+  url: string;
+  /** Fournisseur (whitelist stricte côté sanitize) */
+  provider: "pexels";
+  /** Nom de l'auteur, pour attribution */
+  credit?: string;
+}
+
 export interface SceneBase {
   id: string;
   /** Début en secondes (absolu dans la composition) */
@@ -47,6 +63,8 @@ export interface SceneBase {
   duration: number;
   /** Texte de narration associé (voix off / sous-titre) */
   narration: string;
+  /** Fond vidéo réel optionnel (stock footage) — absent = fond thème par défaut */
+  videoBackground?: VideoBackground;
 }
 
 export interface HookScene extends SceneBase {

@@ -6,3 +6,11 @@ export { mergeAiScenes, type AiScene, type AiStoryboardDraft } from "./ai";
 export { THEMES, VIBE_THEME, resolveTheme } from "./themes";
 export { createRng, hashString } from "./rng";
 export { escapeHtml } from "./escape";
+export {
+  extractKeywords,
+  isVideoBackgroundEligible,
+  createPexelsProvider,
+  resolveSceneVideoBackground,
+  withSearchCache,
+  type StockFootageProvider,
+} from "./stock-footage";

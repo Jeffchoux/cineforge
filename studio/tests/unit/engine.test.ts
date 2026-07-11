@@ -273,6 +273,34 @@ describe("whitelist stricte du brief (durcissement sécurité)", () => {
   });
 });
 
+describe("fond vidéo réel (stock footage)", () => {
+  it("sans videoBackground, aucun calque <video> ni classe has-video-bg sur un clip", () => {
+    const sb = planStoryboard(baseBrief);
+    const html = compileStoryboard(sb);
+    expect(html).not.toContain("<video");
+    expect(html).not.toContain('class="clip has-video-bg"');
+  });
+
+  it("avec videoBackground, émet le calque vidéo + overlay + attribution échappée", () => {
+    const sb = planStoryboard(baseBrief);
+    sb.scenes[0] = {
+      ...sb.scenes[0],
+      videoBackground: {
+        id: "123", provider: "pexels", credit: '<script>alert(1)</script>',
+        url: "https://videos.pexels.com/video-files/123/123-hd.mp4",
+      },
+    } as Scene;
+    const html = compileStoryboard(sb);
+    expect(html).toContain('class="scene-video-bg"');
+    expect(html).toContain("https://videos.pexels.com/video-files/123/123-hd.mp4");
+    expect(html).toContain("scene-video-overlay");
+    expect(html).toContain(`has-video-bg`);
+    // Le crédit passe par le même échappement que tout autre texte utilisateur.
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
 describe("sous-titres (captions)", () => {
   it("ajoute une piste de sous-titres échappée quand captions=true", () => {
     const sb = planStoryboard({ ...baseBrief, topic: "Sujet <b>gras</b>" });

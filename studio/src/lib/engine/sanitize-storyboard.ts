@@ -1,7 +1,37 @@
-import type { Brief, MetaphorVisual, Scene, Storyboard } from "./types";
+import type { Brief, MetaphorVisual, Scene, Storyboard, VideoBackground } from "./types";
 import { ASPECT_DIMENSIONS, BRIEF_LIMITS, SCENE_FIELD_LIMITS } from "./types";
 import { sanitizeBrief } from "./planner";
 import { resolveTheme } from "./themes";
+
+/**
+ * Whitelist stricte des fonds vidéo : seule une URL https pointant vers un
+ * hôte de fournisseur connu peut atteindre le HTML compilé (`<video src>`).
+ * Un storyboard édité à la main ne peut donc jamais injecter une URL
+ * arbitraire — même provenance de confiance qu'un `<img src>` classique,
+ * mais vérifiée explicitement puisque ce champ n'existait pas avant.
+ */
+const TRUSTED_VIDEO_HOSTS: Record<VideoBackground["provider"], string> = {
+  pexels: "videos.pexels.com",
+};
+
+function sanitizeVideoBackground(v: unknown): VideoBackground | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const raw = v as Record<string, unknown>;
+  if (raw.provider !== "pexels") return undefined;
+  if (typeof raw.url !== "string" || typeof raw.id !== "string") return undefined;
+  try {
+    const parsed = new URL(raw.url);
+    if (parsed.protocol !== "https:" || parsed.hostname !== TRUSTED_VIDEO_HOSTS.pexels) return undefined;
+  } catch {
+    return undefined;
+  }
+  return {
+    id: raw.id.slice(0, 40),
+    url: raw.url,
+    provider: "pexels",
+    credit: typeof raw.credit === "string" ? raw.credit.slice(0, 80) : undefined,
+  };
+}
 
 /**
  * Valide et normalise un storyboard venu d'une source non fiable
@@ -44,6 +74,7 @@ export function sanitizeStoryboard(input: unknown): Storyboard {
       start: Math.round(cursor * 100) / 100,
       duration: Math.round(duration * 100) / 100,
       narration: str(s.narration, BRIEF_LIMITS.pointMax),
+      videoBackground: sanitizeVideoBackground(s.videoBackground),
     };
     cursor += duration;
     switch (s.type) {
