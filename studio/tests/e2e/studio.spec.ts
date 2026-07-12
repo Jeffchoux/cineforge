@@ -75,13 +75,24 @@ test.describe("studio — édition et export", () => {
       .poll(async () => (await iframe.getAttribute("srcdoc")) ?? "", { timeout: 10_000 })
       .toContain('class="clip caption-clip"');
 
-    // 3. Export : téléchargement du HTML autonome et du storyboard JSON.
+    // 3. Export HTML autonome : téléchargement direct.
     const htmlDownload = page.waitForEvent("download");
-    await page.getByRole("button", { name: /télécharger html/i }).click();
+    await page.getByRole("button", { name: /^⬇ html$/i }).click();
     expect((await htmlDownload).suggestedFilename()).toMatch(/\.html$/);
 
+    // 4. Rendu cloud non configuré → le CTA « Créer ma vidéo » bascule
+    //    honnêtement sur l'export local (repli gracieux 501). On force le 501
+    //    pour rendre le test déterministe, indépendamment de l'infra worker.
+    await page.route("**/api/render", (route) =>
+      route.fulfill({ status: 501, contentType: "application/json", body: JSON.stringify({ error: "RENDER_UNAVAILABLE" }) }),
+    );
+    await page.getByRole("button", { name: /créer ma vidéo/i }).click();
+    const localDialog = page.getByRole("dialog", { name: /rendu mp4 local/i });
+    await expect(localDialog).toBeVisible();
+
+    // 5. Dans la modale locale : téléchargement du storyboard JSON.
     const jsonDownload = page.waitForEvent("download");
-    await page.getByRole("button", { name: /storyboard \.json/i }).click();
+    await localDialog.getByRole("button", { name: /\.json$/i }).click();
     expect((await jsonDownload).suggestedFilename()).toMatch(/\.json$/);
   });
 });

@@ -1,31 +1,27 @@
 /**
- * CineForge — renderer MP4 local.
+ * CineForge — CLI de rendu MP4 local.
  *
  * Deux modes :
  *   npm run render -- --storyboard path/to/storyboard.json [--out renders/video.mp4]
  *   npm run render -- --topic "Sujet" --duration 20 --vibe cinematic --aspect 16:9 --lang fr [--points "a;b;c"] [--seed 42] [--out ...]
  *
- * Pipeline : storyboard → HTML (engine) → Chromium headless (Playwright),
- * seek frame par frame via window.__cfSeek → screenshots PNG → ffmpeg
- * (image2pipe) → MP4 H.264. Déterministe et offline (GSAP servi en local).
+ * Le cœur du rendu (Playwright + ffmpeg) vit dans `src/lib/render/render-mp4.ts`,
+ * partagé avec le worker de rendu cloud. Ce script n'est que l'emballage CLI :
+ * parse des arguments, garde-fous, journal, et sortie process.
  */
-
-import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { chromium } from "playwright";
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
-  compileStoryboard,
-  sanitizeStoryboard,
   planStoryboard,
+  sanitizeStoryboard,
   type AspectRatio,
   type Brief,
   type Language,
   type Storyboard,
   type Vibe,
 } from "../src/lib/engine";
-
-const GLOBAL_TIMEOUT_MS = 10 * 60 * 1000;
+import { renderStoryboardToFile, RenderError } from "../src/lib/render/render-mp4";
 
 function parseArgs(argv: string[]): Map<string, string> {
   const args = new Map<string, string>();
@@ -104,161 +100,6 @@ function briefFromArgs(args: Map<string, string>): Brief {
   };
 }
 
-async function renderStoryboard(storyboard: Storyboard, outPath: string, captions = false): Promise<void> {
-  const { width, height, fps, durationSec } = storyboard;
-  const totalFrames = Math.round(durationSec * fps);
-  const html = compileStoryboard(storyboard, { captions });
-
-  mkdirSync(dirname(outPath), { recursive: true });
-
-  console.log(
-    `▶ Rendu « ${storyboard.title} » — ${durationSec}s @ ${fps}fps (${totalFrames} frames, ${width}×${height})`,
-  );
-
-  const browser = await chromium.launch();
-  const ffmpeg = spawn("ffmpeg", [
-    "-y",
-    "-f",
-    "image2pipe",
-    "-framerate",
-    String(fps),
-    "-i",
-    "-",
-    "-c:v",
-    "libx264",
-    "-pix_fmt",
-    "yuv420p",
-    "-crf",
-    "18",
-    "-movflags",
-    "+faststart",
-    outPath,
-  ]);
-  let ffmpegStderr = "";
-  ffmpeg.stderr.on("data", (chunk: Buffer) => {
-    ffmpegStderr += chunk.toString();
-    if (ffmpegStderr.length > 20_000) ffmpegStderr = ffmpegStderr.slice(-10_000);
-  });
-  // Sans listener 'error', un EPIPE (ffmpeg mort pendant un write) ferait
-  // planter tout le process au lieu d'échouer proprement.
-  let ffmpegDead = false;
-  ffmpeg.stdin.on("error", () => {
-    ffmpegDead = true;
-  });
-  const ffmpegExit = new Promise<number>((resolveExit, rejectExit) => {
-    ffmpeg.on("error", rejectExit);
-    ffmpeg.on("close", (code) => {
-      ffmpegDead = true;
-      resolveExit(code ?? -1);
-    });
-  });
-
-  try {
-    const context = await browser.newContext({
-      viewport: { width, height },
-      deviceScaleFactor: 1,
-    });
-    const page = await context.newPage();
-
-    const gsapLocal = resolve(__dirname, "../node_modules/gsap/dist/gsap.min.js");
-    // GSAP servi depuis node_modules : rendu déterministe, zéro réseau requis.
-    await page.route("**://cdn.jsdelivr.net/npm/gsap*/**", async (route) => {
-      await route.fulfill({
-        body: readFileSync(gsapLocal, "utf8"),
-        contentType: "application/javascript",
-      });
-    });
-    await page.route("**://cdn.jsdelivr.net/npm/gsap*", async (route) => {
-      await route.fulfill({
-        body: readFileSync(gsapLocal, "utf8"),
-        contentType: "application/javascript",
-      });
-    });
-    // Les Google Fonts passent si le réseau est là, sinon fallback système.
-    await page.route("**://fonts.googleapis.com/**", async (route) => {
-      try {
-        await route.continue();
-      } catch {
-        await route.abort().catch(() => {});
-      }
-    });
-    await page.route("**://fonts.gstatic.com/**", async (route) => {
-      try {
-        await route.continue();
-      } catch {
-        await route.abort().catch(() => {});
-      }
-    });
-
-    await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
-    await page.waitForFunction(
-      () => {
-        const w = window as unknown as {
-          __timelines?: Record<string, unknown>;
-          __cfSeek?: (t: number) => void;
-        };
-        return Boolean(w.__timelines?.["main"]) && typeof w.__cfSeek === "function";
-      },
-      { timeout: 30_000 },
-    );
-    // Laisse les webfonts se poser si elles arrivent (sinon tant pis).
-    await page
-      .evaluate(() => (document as Document & { fonts: FontFaceSet }).fonts.ready)
-      .catch(() => {});
-
-    const started = Date.now();
-    for (let frame = 0; frame < totalFrames; frame++) {
-      if (Date.now() - started > GLOBAL_TIMEOUT_MS) {
-        throw new Error(`Timeout global (${GLOBAL_TIMEOUT_MS / 1000}s) dépassé à la frame ${frame}/${totalFrames}`);
-      }
-      const t = frame / fps;
-      await page.evaluate((time) => {
-        (window as unknown as { __cfSeek: (t: number) => void }).__cfSeek(time);
-      }, t);
-      if (ffmpegDead) {
-        throw new Error(`ffmpeg s'est arrêté prématurément à la frame ${frame}/${totalFrames}.\n${ffmpegStderr.slice(-2_000)}`);
-      }
-      const png = await page.screenshot({ type: "png" });
-      const canContinue = ffmpeg.stdin.write(png);
-      if (!canContinue) {
-        // Attente du drain bornée : si ffmpeg meurt entre-temps, le drain
-        // n'arrivera jamais — on sort au lieu de bloquer indéfiniment.
-        await new Promise<void>((resolveDrain, rejectDrain) => {
-          const timer = setTimeout(
-            () => rejectDrain(new Error(`ffmpeg ne consomme plus les frames (frame ${frame}).\n${ffmpegStderr.slice(-2_000)}`)),
-            30_000,
-          );
-          ffmpeg.stdin.once("drain", () => {
-            clearTimeout(timer);
-            resolveDrain();
-          });
-          ffmpeg.once("close", () => {
-            clearTimeout(timer);
-            rejectDrain(new Error(`ffmpeg s'est arrêté pendant l'encodage (frame ${frame}).\n${ffmpegStderr.slice(-2_000)}`));
-          });
-        });
-      }
-      if ((frame + 1) % 30 === 0 || frame + 1 === totalFrames) {
-        const pct = Math.round(((frame + 1) / totalFrames) * 100);
-        console.log(`  frame ${frame + 1}/${totalFrames} (${pct}%)`);
-      }
-    }
-  } finally {
-    await browser.close().catch(() => {});
-  }
-
-  ffmpeg.stdin.end();
-  const code = await ffmpegExit;
-  if (code !== 0) {
-    fail(`ffmpeg a échoué (code ${code}).\n${ffmpegStderr.slice(-2_000)}`);
-  }
-
-  const size = statSync(outPath).size;
-  console.log(
-    `\n✓ Vidéo rendue : ${outPath}\n  ${(size / 1024).toFixed(1)} KB · ${durationSec}s @ ${fps}fps · ${width}×${height}`,
-  );
-}
-
 async function main(): Promise<void> {
   assertFfmpeg();
   const args = parseArgs(process.argv.slice(2));
@@ -271,10 +112,30 @@ async function main(): Promise<void> {
     storyboard = planStoryboard(briefFromArgs(args));
   }
 
-  const defaultName = `${storyboard.id}.mp4`;
-  const outPath = resolve(args.get("out") ?? `renders/${defaultName}`);
+  const outPath = resolve(args.get("out") ?? `renders/${storyboard.id}.mp4`);
   const captions = args.get("captions") === "true" || args.get("captions") === "";
-  await renderStoryboard(storyboard, outPath, captions);
+  const { width, height, fps, durationSec } = storyboard;
+  const totalFrames = Math.round(durationSec * fps);
+  console.log(
+    `▶ Rendu « ${storyboard.title} » — ${durationSec}s @ ${fps}fps (${totalFrames} frames, ${width}×${height})`,
+  );
+
+  try {
+    const { bytes } = await renderStoryboardToFile(storyboard, outPath, {
+      captions,
+      gsapPath: resolve(__dirname, "../node_modules/gsap/dist/gsap.min.js"),
+      onProgress: (done, total) => {
+        if (done % 30 === 0 || done === total) {
+          console.log(`  frame ${done}/${total} (${Math.round((done / total) * 100)}%)`);
+        }
+      },
+    });
+    console.log(
+      `\n✓ Vidéo rendue : ${outPath}\n  ${(bytes / 1024).toFixed(1)} KB · ${durationSec}s @ ${fps}fps · ${width}×${height}`,
+    );
+  } catch (error) {
+    fail(error instanceof RenderError || error instanceof Error ? error.message : String(error));
+  }
 }
 
 main().catch((error) => {
